@@ -1,0 +1,106 @@
+---
+title: "p8130_FinalProject"
+author: "Jiaqi Li"
+date: "12/9/2017"
+output: html_document
+---
+
+```{r load_libraris, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(psych)
+library(knitr)
+```
+
+```{r read_data, message=FALSE, warning=FALSE}
+ghc <- readxl::read_excel("GHProject_Dataset.xlsx") %>% 
+  clean_names()
+```
+
+Each VisitID represents a unique visit. However, it is possible that a patient visited the hospital more than once. Summarize the number of visits per patient and if multiple visits per patient, select the first visit (by date) recorded. 
+
+```{r clean_data, message=FALSE, warning=FALSE}
+ghc %>% 
+  group_by(patientid) %>% 
+  summarize(n = n())  ## summarize the number of visits per patient
+
+
+ghc <- ghc[!duplicated(ghc$patientid),]  ## if multiple visits per patient, select the first visit (by date) recorded. 
+
+factor_var <- c("is30dayreadmit", "mews", "cindex", "icu_flag")
+ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor variables
+ 
+
+```
+
+```{r table_1, message=FALSE, warning=FALSE}
+## descriptive summary for continuous data
+ghc %>% 
+  describe() %>% 
+  .[-c(1, 2, 5:8, 10, 12:18 ), -c(1, 2, 6, 7, 11, 12, 13)] %>% 
+  kable()
+
+colnames(ghc)[c(5:8, 10, 12:18 )] ## These are indicator variables
+```
+
+```{r exploratory_plots, message=FALSE, warning=FALSE}
+ghc_conti <- ghc[, -c(1, 2, 5:8, 10, 12:18 )] %>% 
+  drop_na()  
+
+panel.hist <- function(x, ...){
+  usr <-par("usr"); on.exit(par(usr))
+  par(usr =c(usr[1:2], 0, 1.5) )
+  h <-hist(x, plot = FALSE, 8)
+  breaks <- h$breaks; nB <-length(breaks)
+  y <- h$counts; y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...){
+  usr <-par("usr");on.exit(par(usr))
+  par(usr =c(0, 1, 0, 1))
+  r <-abs(cor(x, y))
+  txt <-format(c(r, 0.123456789), digits = digits)[1]
+  txt <-paste0(prefix, txt)
+  if(missing(cex.cor)) cex.cor <- 1.2/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex.cor*r*5)
+}
+
+my_line <- function(x,y,...){
+  points(x,y,...)
+  abline(a =lm(y~x)$coefficients[1] , b =lm(y~x)$coefficients[2] , ...)
+}
+
+pairs(ghc_conti, lower.panel = my_line,
+      upper.panel = panel.cor,
+      cex = 1.5, pch = 1, bg = "light blue",
+      diag.panel = panel.hist, cex.labels = 2, font.labels = 2)
+
+## We can see from the panel that the correlation between loshours and losdays2 is 1. It means they are exactly the same thing, which makes sense. So I drop hosdays2
+
+ghc_conti <- ghc_conti[, -2]
+```
+
+```{r transformation, message=FALSE, warning=FALSE} 
+par(mfrow = c(1, 2))
+
+hist(ghc$bpsystolic)
+hist(log(ghc$bpsystolic))
+
+hist(ghc$bmi)
+hist(log(ghc$bmi))
+
+hist(ghc$bpsystolic)
+hist(log(ghc$bpsystolic))
+
+hist(ghc$heartrate)
+hist(log(ghc$heartrate))
+
+hist(ghc$respirationrate)
+hist(log(ghc$respirationrate)) ## still skewed after transformation
+
+hist(ghc$bpdiastolic)
+hist(log(ghc$bpdiastolic)) ## transformation may not need?
+```
+
+Besides these, I also tried several transformations with _evisit_, but none of them looks good.
