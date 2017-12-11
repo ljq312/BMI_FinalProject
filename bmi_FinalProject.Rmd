@@ -14,6 +14,7 @@ library(janitor)
 library(knitr)
 library(corrplot)
 library(tidyverse)
+library(plyr)
 
 ```
 
@@ -63,7 +64,13 @@ ghc %>%
   .[-c(1, 2, 5:8, 10, 12:18,26,27), -c(1, 2, 6, 7, 11, 12, 13)] %>% 
   kable()
 
-colnames(ghc)[c(5:8, 10, 12:18 )] ## These are indicator variables
+colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables
+
+ghc_cate <- ghc %>% 
+  select(c(5:8, 10, 12:18 ))
+
+map(ghc_cate, plyr::count) ## categorical variables frequency table
+
 ```
 
 
