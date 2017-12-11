@@ -286,10 +286,106 @@ ghc %&gt;%
 </tr>
 </tbody>
 </table>
-<pre class="r"><code>colnames(ghc)[c(5:8, 10, 12:18 )] ## These are indicator variables</code></pre>
+<pre class="r"><code>colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables</code></pre>
 <pre><code>##  [1] &quot;is30dayreadmit&quot; &quot;admitdtm&quot;       &quot;mews&quot;           &quot;cindex&quot;        
 ##  [5] &quot;icu_flag&quot;       &quot;postalcode&quot;     &quot;gender&quot;         &quot;race&quot;          
 ##  [9] &quot;religion&quot;       &quot;maritalstatus&quot;  &quot;facilityname&quot;   &quot;insurancetype&quot;</code></pre>
+<pre class="r"><code>ghc_cate &lt;- ghc %&gt;% 
+  select(c(5, 7, 8, 10, 13:18 )) ## removed admitdtm and postalcode from frequency table
+
+map(ghc_cate, plyr::count) </code></pre>
+<pre><code>## $is30dayreadmit
+##   x freq
+## 1 0 3094
+## 2 1  518
+## 
+## $mews
+##       x freq
+## 1     0   39
+## 2     1  609
+## 3     2  716
+## 4     3  787
+## 5     4  690
+## 6     5  323
+## 7     6  149
+## 8     7   86
+## 9     8   25
+## 10    9   14
+## 11   10    5
+## 12   11    4
+## 13   12    1
+## 14   14    1
+## 15 &lt;NA&gt;  163
+## 
+## $cindex
+##   x freq
+## 1 0 1197
+## 2 1  621
+## 3 2  704
+## 4 3  424
+## 5 5  666
+## 
+## $icu_flag
+##   x freq
+## 1 0 3549
+## 2 1   63
+## 
+## $gender
+##        x freq
+## 1 Female 1952
+## 2   Male 1660
+## 
+## $race
+##                      x freq
+## 1   African Amer/Black  772
+## 2                Asian  249
+## 3  Native Amer/Alaskan   22
+## 4 Natv Hawaii/Pacf Isl    4
+## 5    Other/Multiracial  508
+## 6                White 2057
+## 
+## $religion
+##                     x freq
+## 1           Angelican    1
+## 2            Catholic 1648
+## 3           Christian  892
+## 4              Hebrew    1
+## 5               Hindu  122
+## 6               Islam  110
+## 7              Jewish  515
+## 8              Mormon    2
+## 9      No Affiliation  174
+## 10 Non Denominational    1
+## 11              Other  146
+## 
+## $maritalstatus
+##             x freq
+## 1 Civil Union    1
+## 2    Divorced  235
+## 3     Married 1607
+## 4   Separated   51
+## 5      Single  951
+## 6     Widowed  690
+## 7        &lt;NA&gt;   77
+## 
+## $facilityname
+##                             x freq
+## 1         Lenox Hill Hospital    5
+## 2            LIJ Forest Hills  559
+## 3           LIJ Valley Stream  323
+## 4 Long Island Jewish Hospital  813
+## 5                        NSUH  983
+## 6          Plainview Hospital  323
+## 7          Southside Hospital  523
+## 8            Syosset Hospital   83
+## 
+## $insurancetype
+##          x freq
+## 1 Medicaid  166
+## 2 Medicare 1425
+## 3  Private 1987
+## 4     &lt;NA&gt;   34</code></pre>
+<pre class="r"><code>## categorical variables frequency table</code></pre>
 <pre class="r"><code>ghc_conti &lt;- ghc[, -c(1, 2, 5,6,8, 9, 10, 12:18, 26, 27)] %&gt;% 
   drop_na()  
 
