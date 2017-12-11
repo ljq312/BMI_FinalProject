@@ -2,20 +2,40 @@
 title: "p8130_FinalProject"
 author: "Jiaqi Li"
 date: "12/9/2017"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r load_libraris, message=FALSE, warning=FALSE}
-library(tidyverse)
-library(janitor)
 library(psych)
+library(boot)
+library(janitor)
 library(knitr)
-library(plyr)
+library(corrplot)
+library(tidyverse)
+
 ```
 
 ```{r read_data, message=FALSE, warning=FALSE}
+
 ghc <- readxl::read_excel("GHProject_Dataset.xlsx") %>% 
   clean_names()
+
+ghc$date <- as.POSIXct(ghc$admitdtm, format = "%A, %B %d, %Y")
+
+index.final <- 0
+
+for (i in unique(ghc$patientid)) {
+  
+  index <- which(ghc$patientid == i)
+  final.index <- index[which(ghc$date[index] == min(ghc$date[index]))]
+  index.final <- c(index.final, final.index)
+  
+}
+
+ghc <- ghc[index.final, ]
+
 ```
 
 Each VisitID represents a unique visit. However, it is possible that a patient visited the hospital more than once. Summarize the number of visits per patient and if multiple visits per patient, select the first visit (by date) recorded. 
@@ -34,58 +54,72 @@ ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor vari
 
 ```
 
-```{r table_1, message=FALSE, warning=FALSE}
 
+
+```{r table_1, message=FALSE, warning=FALSE}
+## descriptive summary for continuous data
 ghc %>% 
   describe() %>% 
-  .[-c(1, 2, 5:8, 10, 12:18 ), -c(1, 2, 6, 7, 11, 12, 13)] %>% 
-  kable() ## descriptive summary for continuous data
+  .[-c(1, 2, 5:8, 10, 12:18,26,27), -c(1, 2, 6, 7, 11, 12, 13)] %>% 
+  kable()
 
-
-colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables
-
-ghc_cati <- ghc %>% 
-  select(c(5:8, 10, 12:18 ))
-
-map(ghc_cati, count)  ## frequency table for categorical variables
+colnames(ghc)[c(5:8, 10, 12:18 )] ## These are indicator variables
 ```
 
-```{r exploratory_plots, message=FALSE, warning=FALSE}
-ghc_conti <- ghc[, -c(1, 2, 5:8, 10, 12:18 )] %>% 
+
+
+```{r exploratory_plots, message=FALSE, warning=FALSE, eval = TRUE}
+
+ghc_conti <- ghc[, -c(1, 2, 5,6,8, 9, 10, 12:18, 26, 27)] %>% 
   drop_na()  
 
+ghc_conti$mews <- as.numeric(as.character(ghc_conti$mews))
+corrplot(cor(ghc_conti[c("mews","bpsystolic","o2sat","temperature","heartrate",
+          "respirationrate","bpdiastolic","bmi")]), method = "number")
+
 panel.hist <- function(x, ...){
-  usr <-par("usr"); on.exit(par(usr))
-  par(usr =c(usr[1:2], 0, 1.5) )
-  h <-hist(x, plot = FALSE, 8)
-  breaks <- h$breaks; nB <-length(breaks)
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5) )
+  h <- hist(x, plot = FALSE, 8)
+  breaks <- h$breaks; nB <- length(breaks)
   y <- h$counts; y <- y/max(y)
   rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
 }
 
 panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...){
-  usr <-par("usr");on.exit(par(usr))
-  par(usr =c(0, 1, 0, 1))
-  r <-abs(cor(x, y))
-  txt <-format(c(r, 0.123456789), digits = digits)[1]
-  txt <-paste0(prefix, txt)
-  if(missing(cex.cor)) cex.cor <- 1.2/strwidth(txt)
-  text(0.5, 0.5, txt, cex = cex.cor*r*5)
+  usr <- par("usr");on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- abs(cor(x, y))
+  txt <- format(c(r, 0.123456789), digits = digits)[1]
+  txt <- paste0(prefix, txt)
+  if (missing(cex.cor)) cex.cor <- 1.2/strwidth(txt)
+  text(0.5, 0.5, txt, cex = cex.cor*sqrt(sqrt(r))*5)
 }
 
 my_line <- function(x,y,...){
-  points(x,y,...)
-  abline(a =lm(y~x)$coefficients[1] , b =lm(y~x)$coefficients[2] , ...)
+  points(x,y,cex = 6,...)
+  abline(a = lm(y~x)$coefficients[1] , b = lm(y~x)$coefficients[2] , ...)
 }
 
-pairs(ghc_conti, lower.panel = my_line,
+pairs(ghc_conti, lower.panel = panel.smooth,
+      cex = .5,
       upper.panel = panel.cor,
-      cex = 1.5, pch = 1, bg = "light blue",
-      diag.panel = panel.hist, cex.labels = 2, font.labels = 2)
+      pch = 1, bg = "light blue",
+      diag.panel = panel.hist, cex.labels = 1, font.labels = 0.2)
 
 ## We can see from the panel that the correlation between loshours and losdays2 is 1. It means they are exactly the same thing, which makes sense. So I drop hosdays2
 
-ghc_conti <- ghc_conti[, -2]
+ghc_conti <- ghc_conti %>%
+              mutate(log_days = log(losdays2)) %>%
+              select(-loshours, -losdays2)
+              
+
+pairs(ghc_conti, lower.panel = panel.smooth,
+      cex = .5,
+      upper.panel = panel.cor,
+      pch = 1, bg = "light blue",
+      diag.panel = panel.hist, cex.labels = 1, font.labels = 0.2)
+
 ```
 
 ```{r transformation, message=FALSE, warning=FALSE} 
@@ -108,6 +142,164 @@ hist(log(ghc$respirationrate)) ## still skewed after transformation
 
 hist(ghc$bpdiastolic)
 hist(log(ghc$bpdiastolic)) ## transformation may not need?
+
+hist(ghc$losdays2)
+hist(log(ghc$losdays2)) ## Transformation helps
+
+
 ```
 
 Besides these, I also tried several transformations with _evisit_, but none of them looks good.
+
+```{r transformation2}
+
+## There a small quantity for these two hospitals
+
+ghc$facilityname[which(ghc$facilityname == "Lenox Hill Hospital" | 
+                       ghc$facilityname == "Syosset Hospital")] <- "Other"
+
+## Combining religions
+
+ghc$religion[which(ghc$religion == "Angelican")] <- "Christian"
+ghc$religion[which(ghc$religion == "Non Denominational")] <- "Christian"
+ghc$religion[which(ghc$religion == "Mormon")] <- "Christian"
+ghc$religion[which(ghc$religion == "Hebrew")] <- "Jewish"
+ghc$religion[which(ghc$religion == "Angelican")] <- "Christian"
+ghc$religion[which(ghc$religion == "Angelican")] <- "Christian"
+
+## Combining race
+
+ghc$race[which(ghc$race == "Native Amer/Alaskan" | 
+               ghc$race == "Natv Hawaii/Pacf Isl" |
+               ghc$race == "Other/Multiracial"   )] <- "Other"
+
+
+# There's a couple civil union so marking them within married
+
+ghc$maritalstatus[which(ghc$maritalstatus == "Civil Union")] <- "Married"
+
+
+# Get month out
+# take the log of los days
+# Got rid of BMI since there's so many missing values and it's not highly correlated with outcome
+
+ghc_final <- ghc %>% separate(admitdtm, into = c("remove", "Month"), sep = ", ") %>%
+               separate(Month, into = c("Month", "remove2"), sep = " ") %>%
+               dplyr::select(-bmi, -remove, -remove2, -loshours) %>%
+               mutate_if(is.character,as.factor) %>%
+               mutate(log_losday = log(losdays2)) %>%
+               drop_na()
+
+### Month information
+
+## This is highly significant, there's clearly a bias across months
+oneway.test(ghc_final$losdays2 ~ ghc_final$Month)
+
+table <- describeBy(ghc_final$losdays2, group = ghc_final$Month,
+                    mat = TRUE)
+
+# Error bars represent standard error of the mean
+ggplot(table, aes(x = group1, y = mean)) + 
+    geom_bar(position = position_dodge(), stat = "identity") +
+    geom_errorbar(aes(ymin = mean - 2 * se, ymax = mean + 2 * se),
+                  width = .2,                    # Width of the error bars
+                  position = position_dodge(.9))
+
+### The observations for december are from December 29th and 30th.
+### The obvious explanation is that this is right censored so we need to get rid of them
+
+ghc_final <- ghc_final %>% filter(Month != "December")
+
+oneway.test(ghc_final$losdays2 ~ ghc_final$Month)
+
+## MEWS Information
+
+## This is highly significant 
+## Pooled mews according to the groups in the paper
+
+ghc_final$mews <- as.character(ghc_final$mews)
+ghc_final <- ghc_final %>% mutate(group_mews = "ActionRequired")
+ghc_final$group_mews[which(ghc_final$mews == "0" | 
+                     ghc_final$mews == "1")] <- "Normal"
+
+ghc_final$group_mews[which(ghc_final$mews == "2" | 
+                     ghc_final$mews == "3")] <- "Caution"
+
+ghc_final$group_mews[which(ghc_final$mews == "4" | 
+                     ghc_final$mews == "5")] <- "Deterioration"
+
+ghc_final <- ghc_final %>%
+              mutate(group_mews = as.factor(group_mews),
+                     group_mews = forcats::fct_relevel(group_mews, "Normal", 
+                                                       "Caution","Deterioration",
+                                                       "ActionRequired")) %>%
+              dplyr::select(-mews)
+
+oneway.test(ghc_final$losdays2 ~ ghc_final$group_mews)
+
+table <- describeBy(ghc_final$losdays2, group = ghc_final$group_mews,
+                    mat = TRUE)
+
+## Questionable wether to include or not since it overlaps with vital signs
+
+# Error bars represent standard error of the mean
+ggplot(table, aes(x = group1, y = mean)) + 
+    geom_bar(position = position_dodge(), stat = "identity") +
+    geom_errorbar(aes(ymin = mean - 2 * se, ymax = mean + 2 * se),
+                  width = .2,                    # Width of the error bars
+                  position = position_dodge(.9))
+
+ghc_final <- ghc_final %>% 
+                filter(Month != "December",
+                       icu_flag == 0 ) %>%
+                dplyr::select(-patientid, -visitid, -postalcode, 
+                       -facilityzip, -date, -losdays2, -icu_flag, -group_mews)
+
+write_csv(ghc_final, "./BMI_FinalProject_cleandata_SAS.csv")
+
+```
+
+
+
+```{r models}
+
+## This is a test with interactions ignore for now.
+
+FullModel <- glm(formula = log_losday ~ is30dayreadmit + cindex + evisit + 
+    ageyear + maritalstatus + facilityname + insurancetype + 
+    o2sat + temperature + heartrate + respirationrate + bpdiastolic + 
+    is30dayreadmit:cindex + is30dayreadmit:facilityname + 
+    is30dayreadmit:o2sat + evisit:ageyear + ageyear:maritalstatus + 
+    gender:heartrate + gender:bpdiastolic + 
+    facilityname:insurancetype + facilityname:respirationrate, 
+    data = ghc_final)
+
+step(FullModel, direction = "backward", test = "F")
+
+
+MainE_Model <- lm(formula = log_losday ~ ., 
+    data = ghc_final)
+
+## Criterion selection based on AIC
+step(MainE_Model, direction = "backward")
+
+
+## This is the output from criterion AIC selection
+MainE_Model <- glm(formula = log_losday ~ is30dayreadmit + cindex + evisit + 
+    ageyear + gender + maritalstatus + facilityname + insurancetype + 
+    bpsystolic + temperature + heartrate + respirationrate + 
+    bpdiastolic, data = ghc_final)
+
+par(mfrow = c(2, 2))
+plot(MainE_Model)
+
+## Ignore this while I ask Cody about what to do with CV
+cv.Full <- cv.glm(ghc_final, FullModel)
+cv.Full$delta
+
+cv.MainE_Model <- cv.glm(ghc_final, MainE_Model)
+cv.MainE_Model$delta
+
+
+```
+
