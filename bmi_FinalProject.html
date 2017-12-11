@@ -128,7 +128,8 @@ library(boot)
 library(janitor)
 library(knitr)
 library(corrplot)
-library(tidyverse)</code></pre>
+library(tidyverse)
+library(plyr)</code></pre>
 <pre class="r"><code>ghc &lt;- readxl::read_excel(&quot;GHProject_Dataset.xlsx&quot;) %&gt;% 
   clean_names()
 
@@ -146,26 +147,7 @@ for (i in unique(ghc$patientid)) {
 
 ghc &lt;- ghc[index.final, ]</code></pre>
 <p>Each VisitID represents a unique visit. However, it is possible that a patient visited the hospital more than once. Summarize the number of visits per patient and if multiple visits per patient, select the first visit (by date) recorded.</p>
-<pre class="r"><code>ghc %&gt;% 
-  group_by(patientid) %&gt;% 
-  summarize(n = n())  ## summarize the number of visits per patient</code></pre>
-<pre><code>## # A tibble: 3,612 x 2
-##    patientid     n
-##        &lt;dbl&gt; &lt;int&gt;
-##  1       185     1
-##  2       748     1
-##  3      1572     1
-##  4      1837     1
-##  5      2513     1
-##  6      4121     1
-##  7      4956     1
-##  8      5514     1
-##  9      6445     1
-## 10      6674     1
-## # ... with 3,602 more rows</code></pre>
-<pre class="r"><code>ghc &lt;- ghc[!duplicated(ghc$patientid),]  ## if multiple visits per patient, select the first visit (by date) recorded. 
-
-factor_var &lt;- c(&quot;is30dayreadmit&quot;, &quot;mews&quot;, &quot;cindex&quot;, &quot;icu_flag&quot;)
+<pre class="r"><code>factor_var &lt;- c(&quot;is30dayreadmit&quot;, &quot;mews&quot;, &quot;cindex&quot;, &quot;icu_flag&quot;)
 ghc[, factor_var] &lt;- lapply(ghc[, factor_var], factor) ## convert to factor variables</code></pre>
 <pre class="r"><code>## descriptive summary for continuous data
 ghc %&gt;% 
@@ -286,10 +268,508 @@ ghc %&gt;%
 </tr>
 </tbody>
 </table>
-<pre class="r"><code>colnames(ghc)[c(5:8, 10, 12:18 )] ## These are indicator variables</code></pre>
+<pre class="r"><code>colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables</code></pre>
 <pre><code>##  [1] &quot;is30dayreadmit&quot; &quot;admitdtm&quot;       &quot;mews&quot;           &quot;cindex&quot;        
 ##  [5] &quot;icu_flag&quot;       &quot;postalcode&quot;     &quot;gender&quot;         &quot;race&quot;          
 ##  [9] &quot;religion&quot;       &quot;maritalstatus&quot;  &quot;facilityname&quot;   &quot;insurancetype&quot;</code></pre>
+<pre class="r"><code>ghc_cate &lt;- ghc %&gt;% 
+  select(c(5:8, 10, 12:18 ))
+
+map(ghc_cate, plyr::count) ## categorical variables frequency table</code></pre>
+<pre><code>## $is30dayreadmit
+##   x freq
+## 1 0 3094
+## 2 1  518
+## 
+## $admitdtm
+##                                 x freq
+## 1          Friday, April 15, 2016    8
+## 2          Friday, April 29, 2016    2
+## 3         Friday, August 19, 2016   70
+## 4       Friday, December 30, 2016    5
+## 5       Friday, February 05, 2016  106
+## 6        Friday, January 22, 2016   45
+## 7        Friday, January 29, 2016    3
+## 8           Friday, June 10, 2016   60
+## 9           Friday, June 17, 2016    2
+## 10          Friday, June 24, 2016    5
+## 11         Friday, March 11, 2016   23
+## 12           Friday, May 20, 2016    3
+## 13       Friday, October 21, 2016    1
+## 14     Friday, September 09, 2016   72
+## 15     Friday, September 16, 2016    2
+## 16     Friday, September 23, 2016    1
+## 17         Monday, April 18, 2016    4
+## 18        Monday, August 22, 2016    1
+## 19      Monday, February 08, 2016    7
+## 20       Monday, January 25, 2016  133
+## 21          Monday, June 13, 2016  121
+## 22          Monday, June 27, 2016   76
+## 23         Monday, March 07, 2016  139
+## 24         Monday, March 14, 2016    1
+## 25         Monday, March 28, 2016   57
+## 26           Monday, May 02, 2016    3
+## 27           Monday, May 16, 2016  136
+## 28      Monday, November 21, 2016   48
+## 29      Monday, November 28, 2016   68
+## 30     Monday, September 05, 2016   47
+## 31     Monday, September 12, 2016    1
+## 32     Monday, September 26, 2016    1
+## 33       Saturday, April 16, 2016    4
+## 34       Saturday, April 30, 2016   10
+## 35      Saturday, August 20, 2016   58
+## 36    Saturday, February 06, 2016  139
+## 37     Saturday, January 23, 2016   32
+## 38        Saturday, June 11, 2016   92
+## 39        Saturday, June 25, 2016    1
+## 40       Saturday, March 12, 2016   24
+## 41         Saturday, May 14, 2016    2
+## 42   Saturday, September 10, 2016   62
+## 43   Saturday, September 17, 2016    1
+## 44   Saturday, September 24, 2016    5
+## 45         Sunday, April 17, 2016    3
+## 46        Sunday, August 21, 2016   22
+## 47      Sunday, February 07, 2016   21
+## 48       Sunday, January 24, 2016    8
+## 49          Sunday, June 12, 2016   95
+## 50          Sunday, June 19, 2016    3
+## 51          Sunday, June 26, 2016   33
+## 52         Sunday, March 06, 2016   75
+## 53         Sunday, March 13, 2016    1
+## 54           Sunday, May 01, 2016   37
+## 55           Sunday, May 15, 2016   79
+## 56      Sunday, November 20, 2016    1
+## 57      Sunday, November 27, 2016   36
+## 58       Sunday, October 16, 2016    1
+## 59     Sunday, September 11, 2016   17
+## 60     Sunday, September 18, 2016    1
+## 61     Sunday, September 25, 2016    1
+## 62       Thursday, April 14, 2016   10
+## 63       Thursday, April 28, 2016  116
+## 64      Thursday, August 18, 2016   55
+## 65    Thursday, December 29, 2016    9
+## 66    Thursday, February 11, 2016    4
+## 67     Thursday, January 28, 2016    1
+## 68        Thursday, June 09, 2016    4
+## 69        Thursday, June 16, 2016    3
+## 70        Thursday, June 23, 2016  104
+## 71       Thursday, March 31, 2016    1
+## 72         Thursday, May 19, 2016    2
+## 73    Thursday, November 24, 2016    1
+## 74     Thursday, October 20, 2016    3
+## 75   Thursday, September 08, 2016   36
+## 76   Thursday, September 15, 2016    1
+## 77   Thursday, September 22, 2016    2
+## 78        Tuesday, April 12, 2016  106
+## 79        Tuesday, April 19, 2016    1
+## 80     Tuesday, February 09, 2016   68
+## 81      Tuesday, January 12, 2016    2
+## 82      Tuesday, January 26, 2016  104
+## 83         Tuesday, June 07, 2016   50
+## 84         Tuesday, June 14, 2016    9
+## 85         Tuesday, June 21, 2016    1
+## 86         Tuesday, June 28, 2016    2
+## 87        Tuesday, March 08, 2016    9
+## 88        Tuesday, March 29, 2016   74
+## 89          Tuesday, May 17, 2016    5
+## 90          Tuesday, May 24, 2016    1
+## 91     Tuesday, November 22, 2016   43
+## 92     Tuesday, November 29, 2016    6
+## 93      Tuesday, October 18, 2016    5
+## 94    Tuesday, September 06, 2016   56
+## 95    Tuesday, September 13, 2016    2
+## 96    Tuesday, September 20, 2016   58
+## 97      Wednesday, April 13, 2016  145
+## 98      Wednesday, April 27, 2016   93
+## 99     Wednesday, August 17, 2016    1
+## 100    Wednesday, August 24, 2016    2
+## 101  Wednesday, February 10, 2016   90
+## 102   Wednesday, January 13, 2016    1
+## 103      Wednesday, June 01, 2016    1
+## 104      Wednesday, June 08, 2016   41
+## 105      Wednesday, June 15, 2016    4
+## 106      Wednesday, June 22, 2016   84
+## 107      Wednesday, June 29, 2016    2
+## 108     Wednesday, March 09, 2016    3
+## 109     Wednesday, March 30, 2016    4
+## 110       Wednesday, May 18, 2016    2
+## 111  Wednesday, November 23, 2016    1
+## 112  Wednesday, November 30, 2016    2
+## 113 Wednesday, September 07, 2016    5
+## 114 Wednesday, September 21, 2016   62
+## 
+## $mews
+##       x freq
+## 1     0   39
+## 2     1  609
+## 3     2  716
+## 4     3  787
+## 5     4  690
+## 6     5  323
+## 7     6  149
+## 8     7   86
+## 9     8   25
+## 10    9   14
+## 11   10    5
+## 12   11    4
+## 13   12    1
+## 14   14    1
+## 15 &lt;NA&gt;  163
+## 
+## $cindex
+##   x freq
+## 1 0 1197
+## 2 1  621
+## 3 2  704
+## 4 3  424
+## 5 5  666
+## 
+## $icu_flag
+##   x freq
+## 1 0 3549
+## 2 1   63
+## 
+## $postalcode
+##         x freq
+## 1   10001    1
+## 2   10003    1
+## 3   10011    1
+## 4   10019    1
+## 5   10022    1
+## 6   10023    1
+## 7   10024    1
+## 8   10025    3
+## 9   10029    1
+## 10  10032    3
+## 11  10039    1
+## 12  10075    2
+## 13  10303    1
+## 14  10305    1
+## 15  10306    1
+## 16  10312    1
+## 17  10314    1
+## 18  10368    1
+## 19  10451    1
+## 20  10452    1
+## 21  10453    2
+## 22  10455    1
+## 23  10458    1
+## 24  10460    1
+## 25  10461    1
+## 26  10465    3
+## 27  10469    3
+## 28  10472    1
+## 29  10473    1
+## 30  10552    1
+## 31  10567    1
+## 32  10583    1
+## 33  10589    1
+## 34  10705    1
+## 35  10960    1
+## 36  10977    1
+## 37  11001   39
+## 38  11003   58
+## 39  11004   36
+## 40  11005   14
+## 41  11010   32
+## 42  11020    9
+## 43  11021   38
+## 44  11023   13
+## 45  11024   15
+## 46  11030   11
+## 47  11040   53
+## 48  11050   22
+## 49  11096    4
+## 50  11101    4
+## 51  11102    2
+## 52  11103    3
+## 53  11104    6
+## 54  11105    4
+## 55  11106    5
+## 56  11132    1
+## 57  11201    2
+## 58  11202    1
+## 59  11204    2
+## 60  11206    2
+## 61  11207    7
+## 62  11208    8
+## 63  11210    3
+## 64  11211    4
+## 65  11212    2
+## 66  11213    2
+## 67  11214    1
+## 68  11216    2
+## 69  11218    1
+## 70  11221    3
+## 71  11222    5
+## 72  11223    3
+## 73  11225    1
+## 74  11226    1
+## 75  11233    1
+## 76  11234    1
+## 77  11235    2
+## 78  11236    3
+## 79  11237    7
+## 80  11239    5
+## 81  11255    1
+## 82  11354   15
+## 83  11355    8
+## 84  11356   10
+## 85  11357   29
+## 86  11358   22
+## 87  11360   30
+## 88  11361   34
+## 89  11362   20
+## 90  11363    6
+## 91  11364   37
+## 92  11365   34
+## 93  11366   11
+## 94  11367   17
+## 95  11368   80
+## 96  11369   21
+## 97  11370    8
+## 98  11372   19
+## 99  11373   31
+## 100 11374   70
+## 101 11375  120
+## 102 11377   24
+## 103 11378   21
+## 104 11379   36
+## 105 11385   38
+## 106 11411   36
+## 107 11412   58
+## 108 11413   71
+## 109 11414   37
+## 110 11415   12
+## 111 11416   21
+## 112 11417   22
+## 113 11418   22
+## 114 11419   41
+## 115 11420   27
+## 116 11421   20
+## 117 11422   41
+## 118 11423   50
+## 119 11424    1
+## 120 11425    1
+## 121 11426   25
+## 122 11427   44
+## 123 11428   40
+## 124 11429   49
+## 125 11430    1
+## 126 11431    2
+## 127 11432   34
+## 128 11433   36
+## 129 11434   94
+## 130 11435   35
+## 131 11436   16
+## 132 11501    9
+## 133 11507    4
+## 134 11509    1
+## 135 11510    8
+## 136 11514    1
+## 137 11516    2
+## 138 11518    6
+## 139 11520    7
+## 140 11530   14
+## 141 11542   17
+## 142 11545    3
+## 143 11547    1
+## 144 11550   18
+## 145 11552   10
+## 146 11553   10
+## 147 11554   20
+## 148 11557    1
+## 149 11558    1
+## 150 11559    3
+## 151 11560    1
+## 152 11561    8
+## 153 11563   13
+## 154 11565    5
+## 155 11566    7
+## 156 11568    3
+## 157 11570    5
+## 158 11572    6
+## 159 11575    6
+## 160 11576    2
+## 161 11577   12
+## 162 11579    1
+## 163 11580   93
+## 164 11581   23
+## 165 11590   30
+## 166 11596    7
+## 167 11598    5
+## 168 11634    1
+## 169 11691   34
+## 170 11692    8
+## 171 11693   12
+## 172 11694    8
+## 173 11697    2
+## 174 11701   17
+## 175 11702    8
+## 176 11703    5
+## 177 11704   22
+## 178 11705    2
+## 179 11706   97
+## 180 11709    3
+## 181 11710   10
+## 182 11714   40
+## 183 11715    2
+## 184 11716   15
+## 185 11717   89
+## 186 11718    4
+## 187 11720    2
+## 188 11722   66
+## 189 11725    9
+## 190 11726    4
+## 191 11727    2
+## 192 11729   16
+## 193 11730   30
+## 194 11731    1
+## 195 11732    6
+## 196 11735   31
+## 197 11741    5
+## 198 11742    2
+## 199 11743    9
+## 200 11746   16
+## 201 11747   39
+## 202 11749    4
+## 203 11751   22
+## 204 11752   14
+## 205 11753   16
+## 206 11754    2
+## 207 11755    1
+## 208 11756   30
+## 209 11757   17
+## 210 11758   42
+## 211 11762   10
+## 212 11763    3
+## 213 11764    1
+## 214 11767    1
+## 215 11768    1
+## 216 11769   19
+## 217 11771    8
+## 218 11772    5
+## 219 11776    2
+## 220 11777    1
+## 221 11779    5
+## 222 11780    2
+## 223 11782   19
+## 224 11783   19
+## 225 11784    2
+## 226 11787    5
+## 227 11788    5
+## 228 11789    1
+## 229 11790    4
+## 230 11791   24
+## 231 11793   21
+## 232 11795   16
+## 233 11796    5
+## 234 11797   25
+## 235 11798    6
+## 236 11801   51
+## 237 11802    1
+## 238 11803   64
+## 239 11804   12
+## 240 11901    4
+## 241 11935    1
+## 242 11940    2
+## 243 11946    1
+## 244 11949    1
+## 245 11950    2
+## 246 11951    2
+## 247 11952    1
+## 248 11953    2
+## 249 11965    1
+## 250 11967    2
+## 251 11968    1
+## 252 11975    1
+## 253 11977    1
+## 254 12521    1
+## 255 12553    1
+## 256 12561    1
+## 257 12866    1
+## 258 12986    1
+## 259 14051    1
+## 260 14221    1
+## 261 18324    1
+## 262 18337    1
+## 263 19709    1
+## 264 20019    1
+## 265 21075    1
+## 266 21221    1
+## 267 27406    1
+## 268 27577    1
+## 269 29456    1
+## 270 31404    1
+## 271 32137    1
+## 272 32907    1
+## 273 33134    1
+## 274 33410    1
+## 275 33432    1
+## 276 33434    1
+## 277 33446    2
+## 278 33634    1
+## 279 34109    1
+## 280 34667    1
+## 281 54742    1
+## 282  8889    1
+## 283    NA   32
+## 
+## $gender
+##        x freq
+## 1 Female 1952
+## 2   Male 1660
+## 
+## $race
+##                      x freq
+## 1   African Amer/Black  772
+## 2                Asian  249
+## 3  Native Amer/Alaskan   22
+## 4 Natv Hawaii/Pacf Isl    4
+## 5    Other/Multiracial  508
+## 6                White 2057
+## 
+## $religion
+##                     x freq
+## 1           Angelican    1
+## 2            Catholic 1648
+## 3           Christian  892
+## 4              Hebrew    1
+## 5               Hindu  122
+## 6               Islam  110
+## 7              Jewish  515
+## 8              Mormon    2
+## 9      No Affiliation  174
+## 10 Non Denominational    1
+## 11              Other  146
+## 
+## $maritalstatus
+##             x freq
+## 1 Civil Union    1
+## 2    Divorced  235
+## 3     Married 1607
+## 4   Separated   51
+## 5      Single  951
+## 6     Widowed  690
+## 7        &lt;NA&gt;   77
+## 
+## $facilityname
+##                             x freq
+## 1         Lenox Hill Hospital    5
+## 2            LIJ Forest Hills  559
+## 3           LIJ Valley Stream  323
+## 4 Long Island Jewish Hospital  813
+## 5                        NSUH  983
+## 6          Plainview Hospital  323
+## 7          Southside Hospital  523
+## 8            Syosset Hospital   83
+## 
+## $insurancetype
+##          x freq
+## 1 Medicaid  166
+## 2 Medicare 1425
+## 3  Private 1987
+## 4     &lt;NA&gt;   34</code></pre>
 <pre class="r"><code>ghc_conti &lt;- ghc[, -c(1, 2, 5,6,8, 9, 10, 12:18, 26, 27)] %&gt;% 
   drop_na()  
 
@@ -650,61 +1130,35 @@ step(FullModel, direction = &quot;backward&quot;, test = &quot;F&quot;)</code></
 ## Degrees of Freedom: 3257 Total (i.e. Null);  3197 Residual
 ## Null Deviance:       2599 
 ## Residual Deviance: 2166  AIC: 8040</code></pre>
-<pre class="r"><code>MainE_Model &lt;- lm(formula = log_losday ~ ., 
+<pre class="r"><code>MainE_Model &lt;- lm(formula = log_losday ~ . - Month, 
     data = ghc_final)
 
 ## Criterion selection based on AIC
 step(MainE_Model, direction = &quot;backward&quot;)</code></pre>
-<pre><code>## Start:  AIC=-1141.8
-## log_losday ~ is30dayreadmit + Month + cindex + evisit + ageyear + 
+<pre><code>## Start:  AIC=-1144.85
+## log_losday ~ (is30dayreadmit + Month + cindex + evisit + ageyear + 
 ##     gender + race + religion + maritalstatus + facilityname + 
 ##     insurancetype + bpsystolic + o2sat + temperature + heartrate + 
-##     respirationrate + bpdiastolic
+##     respirationrate + bpdiastolic) - Month
 ## 
 ##                   Df Sum of Sq    RSS     AIC
-## - race             3     1.035 2233.3 -1146.3
-## - Month            9    10.265 2242.6 -1144.8
-## - religion         6     6.734 2239.0 -1144.0
-## &lt;none&gt;                         2232.3 -1141.8
-## - o2sat            1     1.415 2233.7 -1141.7
-## - temperature      1     2.776 2235.1 -1139.8
-## - maritalstatus    4     7.228 2239.5 -1139.3
-## - facilityname     6    10.017 2242.3 -1139.2
-## - gender           1     5.286 2237.6 -1136.1
-## - respirationrate  1     6.941 2239.2 -1133.7
-## - bpdiastolic      1     8.916 2241.2 -1130.8
-## - insurancetype    2    10.800 2243.1 -1130.1
-## - is30dayreadmit   1     9.481 2241.8 -1130.0
-## - bpsystolic       1    10.226 2242.5 -1128.9
-## - cindex           4    17.278 2249.6 -1124.7
-## - evisit           1    25.645 2257.9 -1106.6
-## - heartrate        1    28.365 2260.7 -1102.7
-## - ageyear          1    54.933 2287.2 -1064.6
-## 
-## Step:  AIC=-1146.29
-## log_losday ~ is30dayreadmit + Month + cindex + evisit + ageyear + 
-##     gender + religion + maritalstatus + facilityname + insurancetype + 
-##     bpsystolic + o2sat + temperature + heartrate + respirationrate + 
-##     bpdiastolic
-## 
-##                   Df Sum of Sq    RSS     AIC
-## - Month            9    10.349 2243.7 -1149.2
-## - religion         6     7.814 2241.1 -1146.9
-## - o2sat            1     1.330 2234.7 -1146.3
-## &lt;none&gt;                         2233.3 -1146.3
-## - temperature      1     2.691 2236.0 -1144.4
-## - facilityname     6     9.711 2243.0 -1144.2
-## - maritalstatus    4     7.847 2241.2 -1142.9
-## - gender           1     5.038 2238.4 -1141.0
-## - respirationrate  1     7.050 2240.4 -1138.0
-## - bpdiastolic      1     8.563 2241.9 -1135.8
-## - insurancetype    2    10.740 2244.1 -1134.7
-## - is30dayreadmit   1     9.411 2242.7 -1134.6
-## - bpsystolic       1     9.857 2243.2 -1133.9
-## - cindex           4    17.777 2251.1 -1128.5
-## - evisit           1    26.966 2260.3 -1109.2
-## - heartrate        1    28.022 2261.3 -1107.7
-## - ageyear          1    54.469 2287.8 -1069.8
+## - race             3     1.118 2243.7 -1149.2
+## - religion         6     6.499 2249.1 -1147.4
+## &lt;none&gt;                         2242.6 -1144.8
+## - o2sat            1     1.389 2243.9 -1144.8
+## - maritalstatus    4     7.100 2249.7 -1142.5
+## - facilityname     6     9.936 2252.5 -1142.5
+## - temperature      1     3.185 2245.7 -1142.2
+## - gender           1     5.508 2248.1 -1138.9
+## - respirationrate  1     6.933 2249.5 -1136.8
+## - bpdiastolic      1     8.745 2251.3 -1134.2
+## - insurancetype    2    10.181 2252.7 -1134.1
+## - is30dayreadmit   1     9.417 2252.0 -1133.2
+## - bpsystolic       1    10.910 2253.5 -1131.0
+## - cindex           4    17.684 2260.2 -1127.3
+## - evisit           1    24.744 2267.3 -1111.1
+## - heartrate        1    28.656 2271.2 -1105.5
+## - ageyear          1    55.641 2298.2 -1067.0
 ## 
 ## Step:  AIC=-1149.22
 ## log_losday ~ is30dayreadmit + cindex + evisit + ageyear + gender + 
