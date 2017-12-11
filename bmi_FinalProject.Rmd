@@ -10,6 +10,7 @@ library(tidyverse)
 library(janitor)
 library(psych)
 library(knitr)
+library(plyr)
 ```
 
 ```{r read_data, message=FALSE, warning=FALSE}
@@ -34,13 +35,19 @@ ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor vari
 ```
 
 ```{r table_1, message=FALSE, warning=FALSE}
-## descriptive summary for continuous data
+
 ghc %>% 
   describe() %>% 
   .[-c(1, 2, 5:8, 10, 12:18 ), -c(1, 2, 6, 7, 11, 12, 13)] %>% 
-  kable()
+  kable() ## descriptive summary for continuous data
 
-colnames(ghc)[c(5:8, 10, 12:18 )] ## These are indicator variables
+
+colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables
+
+ghc_cati <- ghc %>% 
+  select(c(5:8, 10, 12:18 ))
+
+map(ghc_cati, count)  ## frequency table for categorical variables
 ```
 
 ```{r exploratory_plots, message=FALSE, warning=FALSE}
