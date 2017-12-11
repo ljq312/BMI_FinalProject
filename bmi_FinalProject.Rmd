@@ -277,7 +277,7 @@ FullModel <- glm(formula = log_losday ~ is30dayreadmit + cindex + evisit +
 step(FullModel, direction = "backward", test = "F")
 
 
-MainE_Model <- lm(formula = log_losday ~ ., 
+MainE_Model <- lm(formula = log_losday ~ . - Month, 
     data = ghc_final)
 
 ## Criterion selection based on AIC
