@@ -42,12 +42,6 @@ ghc <- ghc[index.final, ]
 Each VisitID represents a unique visit. However, it is possible that a patient visited the hospital more than once. Summarize the number of visits per patient and if multiple visits per patient, select the first visit (by date) recorded. 
 
 ```{r clean_data, message=FALSE, warning=FALSE}
-ghc %>% 
-  group_by(patientid) %>% 
-  summarize(n = n())  ## summarize the number of visits per patient
-
-
-ghc <- ghc[!duplicated(ghc$patientid),]  ## if multiple visits per patient, select the first visit (by date) recorded. 
 
 factor_var <- c("is30dayreadmit", "mews", "cindex", "icu_flag")
 ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor variables
