@@ -14,11 +14,11 @@ library(janitor)
 library(knitr)
 library(corrplot)
 library(tidyverse)
-
+library(plyr)
 
 ```
 
-```{r read_data, message=FALSE, warning=FALSE}
+```{r read_data, message=FALSE, warning=FALSE, cache = T}
 
 ghc <- readxl::read_excel("GHProject_Dataset.xlsx") %>% 
   clean_names()
@@ -41,7 +41,7 @@ ghc <- ghc[index.final, ]
 
 Each VisitID represents a unique visit. However, it is possible that a patient visited the hospital more than once. Summarize the number of visits per patient and if multiple visits per patient, select the first visit (by date) recorded. 
 
-```{r clean_data, message=FALSE, warning=FALSE}
+```{r clean_data, message=FALSE, warning=FALSE, cache = T}
 
 factor_var <- c("is30dayreadmit", "mews", "cindex", "icu_flag")
 ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor variables
@@ -51,7 +51,7 @@ ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor vari
 
 
 
-```{r table_1, message=FALSE, warning=FALSE}
+```{r table_1, message=FALSE, warning=FALSE, cache = T}
 ## descriptive summary for continuous data
 ghc %>% 
   describe() %>% 
@@ -61,16 +61,15 @@ ghc %>%
 colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables
 
 ghc_cate <- ghc %>% 
-  select(c(5, 7, 8, 10, 13:18 )) ## removed admitdtm and postalcode from frequency table
+  select(c(5:8, 10, 12:18 ))
 
-map(ghc_cate, plyr::count) 
-## categorical variables frequency table
+map(ghc_cate, plyr::count) ## categorical variables frequency table
 
 ```
 
 
 
-```{r exploratory_plots, message=FALSE, warning=FALSE, eval = TRUE}
+```{r exploratory_plots, message=FALSE, warning=FALSE, eval = TRUE, cache = T}
 
 ghc_conti <- ghc[, -c(1, 2, 5,6,8, 9, 10, 12:18, 26, 27)] %>% 
   drop_na()  
@@ -124,7 +123,7 @@ pairs(ghc_conti, lower.panel = panel.smooth,
 
 ```
 
-```{r transformation, message=FALSE, warning=FALSE} 
+```{r transformation, message=FALSE, warning=FALSE, cache = T} 
 par(mfrow = c(1, 2))
 
 hist(ghc$bpsystolic)
@@ -153,7 +152,7 @@ hist(log(ghc$losdays2)) ## Transformation helps
 
 Besides these, I also tried several transformations with _evisit_, but none of them looks good.
 
-```{r transformation2}
+```{r transformation2, cache = T}
 
 ## There a small quantity for these two hospitals
 
@@ -275,22 +274,7 @@ write_csv(ghc_final, "./BMI_FinalProject_cleandata_SAS.csv")
 ```
 
 
-
 ```{r models}
-
-## This is a test with interactions ignore for now.
-
-#FullModel <- glm(formula = log_losday ~ is30dayreadmit + cindex + evisit + 
-#    ageyear + maritalstatus + facilityname + insurancetype + 
-#    o2sat + temperature + heartrate + respirationrate + bpdiastolic + 
-#    is30dayreadmit:cindex + is30dayreadmit:facilityname + 
-#    is30dayreadmit:o2sat + evisit:ageyear + ageyear:maritalstatus + 
-#    gender:heartrate + gender:bpdiastolic + 
-#    facilityname:insurancetype + facilityname:respirationrate, 
-#    data = ghc_final)
-
-#step(FullModel, direction = "backward", test = "F")
-
 
 MainE_Model <- lm(formula = log_losday ~ . - Month, 
     data = ghc_final)
@@ -300,7 +284,7 @@ step(MainE_Model, direction = "backward")
 
 
 ## This is the output from criterion AIC selection
-MainE_Model <- glm(formula = log_losday ~ is30dayreadmit + evisit + ageyear + 
+MainE_Model <- lm(formula = log_losday ~ is30dayreadmit + evisit + ageyear + 
     gender + maritalstatus + facilityname + insurancetype + bpsystolic + 
     temperature + heartrate + respirationrate + bpdiastolic + 
     cindex_cat, data = ghc_final)
@@ -308,14 +292,46 @@ MainE_Model <- glm(formula = log_losday ~ is30dayreadmit + evisit + ageyear +
 par(mfrow = c(2, 2))
 plot(MainE_Model)
 
-## Ignore this while I ask Cody about what to do with CV
+MainE_Model %>% broom::tidy() %>% kable(digits = 3)
 
-#cv.Full <- cv.glm(ghc_final, FullModel)
-#cv.Full$delta
+```
 
-cv.MainE_Model <- cv.glm(ghc_final, MainE_Model)
-cv.MainE_Model$delta
+```{r influence_vif}
+
+t <- summary(influence.measures(MainE_Model))
+
+vif(MainE_Model)
+
+```
+
+
+
+```{r validation}
+
+## Bootstrap 
+
+boot.fn <- function(data, index){
+	model <- lm(formula = log_losday ~ is30dayreadmit + evisit + ageyear + 
+    gender + maritalstatus + facilityname + insurancetype + bpsystolic + 
+    temperature + heartrate + respirationrate + bpdiastolic + 
+    cindex_cat, data = data, subset = index)
+	RSE <- summary(model)$sigma
+	
+	return(RSE^2)
+	
+}
+
+boot.fn(ghc_final, 1:3258)
+
+set.seed(1)
+
+boot.output <- boot(ghc_final, boot.fn, 10000)
+
+boot.ci(boot.output, type = "perc")
+
+plot(boot.output)
 
 
 ```
+
 
