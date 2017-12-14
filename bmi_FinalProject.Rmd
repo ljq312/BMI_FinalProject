@@ -8,6 +8,8 @@ output:
 ---
 
 ```{r load_libraris, message=FALSE, warning=FALSE}
+library(car)
+library(caret)
 library(leaps)
 library(psych)
 library(boot)
@@ -318,7 +320,7 @@ MainE_Model <- lm(formula = log_losday ~ is30dayreadmit + cindex_cat + evisit +
 par(mfrow = c(2, 2))
 plot(MainE_Model)
 
-MainE_Model %>% broom::tidy() %>% kable(digits = 3)
+t <- MainE_Model %>% broom::tidy() %>% kable(digits = 3)
 
 ## This gives you the pvalues of testing the model with and without each variable
 drop1(MainE_Model, test = "F") %>% broom::tidy() %>% kable(digits = 3)
@@ -326,18 +328,75 @@ drop1(MainE_Model, test = "F") %>% broom::tidy() %>% kable(digits = 3)
 ```
 
 
-
-```{r influence_vif}
-
+```{r influence_vif, cache = T}
 t <- summary(influence.measures(MainE_Model))
 
+## VIF indicates we are fine
 vif(MainE_Model)
+
+
+## This can be added to the appendix as a sensitivity analysis 
+## This is the final model
+MainE_Model_subset <- lm(formula = log_losday ~ is30dayreadmit + cindex_cat + evisit + 
+    ageyear + gender + maritalstatus + facilityname + insurancetype + 
+    bpsystolic + temperature + heartrate + o2sat + respirationrate + 
+    bpdiastolic, data = ghc_final, subset = -as.numeric(row.names(t)))
+
+t2 <- MainE_Model_subset %>% broom::tidy() %>% kable(digits = 3)
+
+```
+
+There's `r  length(row.names(t))` influencial observations as flagged by different criterion. 
+
+```{r validation_cv, cache = TRUE}
+
+set.seed(1)
+
+grand.MSE <- 0
+
+folds <- c(rep(1,257),
+           rep(2,257),
+           rep(3,257),
+           rep(4,257),
+           rep(5,257),
+           rep(6,257),
+           rep(7,257),
+           rep(8,257),
+           rep(9,256),
+           rep(10,256))
+
+for (i in 1:100) {
+  
+  index <- sample(folds, size = 2568, replace = FALSE)
+  
+  MSE <- 0
+  
+  for (j in 1:10) {
+    
+    model <- lm(formula = log_losday ~ is30dayreadmit + cindex_cat + evisit + 
+    ageyear + gender + maritalstatus + facilityname + insurancetype + 
+    bpsystolic + temperature + heartrate + o2sat + respirationrate + 
+    bpdiastolic, data = ghc_final, subset = which(index != j))
+    
+    MSE = c(MSE, mean((ghc_final$log_losday[which(index == j)] - 
+                         predict(model, ghc_final[which(index == j), ]))^2))
+    
+  }
+  
+  grand.MSE <- c(grand.MSE, mean(MSE[-1]))
+  
+}
+
+cv.MSE <- mean(grand.MSE[-1])
+cv.MSE
+
+mean((ghc_final$log_losday - predict(MainE_Model))^2)
 
 ```
 
 
 
-```{r validation}
+```{r validation_boot, cache = T}
 
 ## Bootstrap 
 
