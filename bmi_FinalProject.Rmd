@@ -17,7 +17,7 @@ library(janitor)
 library(knitr)
 library(corrplot)
 library(tidyverse)
-library(plyr)
+library(dplyr)
 
 ```
 
@@ -46,7 +46,7 @@ Each VisitID represents a unique visit. However, it is possible that a patient v
 
 ```{r clean_data, message=FALSE, warning=FALSE, cache = T}
 
-factor_var <- c("is30dayreadmit", "mews", "cindex", "icu_flag")
+factor_var <- c("is30dayreadmit", "mews", "cindex", "icu_flag", "evisit", "gender", "race", "religion", "maritalstatus", "insurancetype")
 ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor variables
  
 
@@ -54,24 +54,65 @@ ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor vari
 
 
 
-```{r table_1, message=FALSE, warning=FALSE, cache = T}
+```{r continous_table, message=FALSE, warning=FALSE, cache = T}
+
 ## descriptive summary for continuous data
-ghc %>% 
+
+ghc_conti_summary <- ghc %>% 
   describe() %>% 
-  .[-c(1, 2, 5:8, 10, 12:18,26,27), -c(1, 2, 6, 7, 11, 12, 13)] %>% 
+  .[-c(1, 2, 5:10, 12:18,26,27), -c(1, 2, 6, 7, 11, 12, 13)] 
+
+ghc_conti <- ghc[, -c(1, 2, 5:10, 12:18,26,27)]
+
+slr <- function(variable) {
+  lm(loshours ~ variable, data = ghc_conti)
+
+}
+
+slr_conti <- map(ghc_conti, slr) %>% 
+  map_df(., broom::tidy) %>% 
+  filter(term == "variable") %>% 
+  select(estimate, p.value) %>% 
+  cbind(ghc_conti_summary, .)
+
+CI <- function(variable) {
+  a <- lm(losdays2 ~ variable, data = ghc_conti)
+  confint(a)
+}
+
+CI_conti <- map_df(ghc_conti, CI) %>% 
+  .[c(2, 4),] %>% 
+  t() %>% 
+  cbind(slr_conti, .) 
+
+colnames(CI_conti)[c(7, 9, 10)] <- c("beta1", "CI lower", "CI upper")
+
+conti_summary <- round(CI_conti, 4) %>% 
   kable()
 
-colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables
+conti_summary
+```
 
-ghc_cate <- ghc %>% 
-  select(c(5:8, 10, 12:18 ))
+```{r categorical_table, message=FALSE, warning=FALSE, cache = T}
 
-map(ghc_cate, plyr::count) ## categorical variables frequency table
+## descriptive summary for categorical data
+
+colnames(ghc)[c(5:10, 12:18 )] ## These are categorical variables
+
+ghc_cate <- ghc[,c(5, 7:10, 13:18 )] 
+map(ghc_cate, table)
+ 
+
+  # t() %>% 
+  cbind() %>% 
+  View()
+  
+  ## categorical variables frequency table
 
 ```
 
 
-```{r cleaning_vitals}
+```{r cleaning_table }
 
 ## The smallest ever recorded BMI is 7 
 ## Temperatures higher than 46 or 21 indicate death you are dying.
