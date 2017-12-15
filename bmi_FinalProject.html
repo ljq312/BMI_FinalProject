@@ -132,7 +132,7 @@ library(janitor)
 library(knitr)
 library(corrplot)
 library(tidyverse)
-library(plyr)</code></pre>
+library(dplyr)</code></pre>
 <pre class="r"><code>ghc &lt;- readxl::read_excel(&quot;GHProject_Dataset.xlsx&quot;) %&gt;% 
   clean_names()
 
@@ -150,13 +150,43 @@ for (i in unique(ghc$patientid)) {
 
 ghc &lt;- ghc[index.final, ]</code></pre>
 <p>Each VisitID represents a unique visit. However, it is possible that a patient visited the hospital more than once. Summarize the number of visits per patient and if multiple visits per patient, select the first visit (by date) recorded.</p>
-<pre class="r"><code>factor_var &lt;- c(&quot;is30dayreadmit&quot;, &quot;mews&quot;, &quot;cindex&quot;, &quot;icu_flag&quot;)
+<pre class="r"><code>factor_var &lt;- c(&quot;is30dayreadmit&quot;, &quot;mews&quot;, &quot;cindex&quot;, &quot;icu_flag&quot;, &quot;evisit&quot;, &quot;gender&quot;, &quot;race&quot;, &quot;religion&quot;, &quot;maritalstatus&quot;, &quot;facilityname&quot;, &quot;insurancetype&quot;)
 ghc[, factor_var] &lt;- lapply(ghc[, factor_var], factor) ## convert to factor variables</code></pre>
 <pre class="r"><code>## descriptive summary for continuous data
-ghc %&gt;% 
+
+ghc_conti_summary &lt;- ghc %&gt;% 
   describe() %&gt;% 
-  .[-c(1, 2, 5:8, 10, 12:18,26,27), -c(1, 2, 6, 7, 11, 12, 13)] %&gt;% 
-  kable()</code></pre>
+  .[-c(1, 2, 5:10, 12:18,26,27), -c(1, 2, 6, 7, 10, 11, 12, 13)] 
+
+ghc_conti &lt;- ghc[, -c(1, 2, 5:10, 12:18,26,27)]
+
+slr &lt;- function(variable) {
+  lm(losdays2 ~ variable, data = ghc_conti)
+
+}
+
+slr_conti &lt;- map(ghc_conti, slr) %&gt;% 
+  map_df(., broom::tidy) %&gt;% 
+  filter(term == &quot;variable&quot;) %&gt;% 
+  select(estimate, p.value) %&gt;% 
+  cbind(ghc_conti_summary, .)
+
+CI &lt;- function(variable) {
+  a &lt;- lm(losdays2 ~ variable, data = ghc_conti)
+  confint(a)
+}
+
+CI_conti &lt;- map_df(ghc_conti, CI) %&gt;% 
+  .[c(2, 4),] %&gt;% 
+  t() %&gt;% 
+  cbind(slr_conti, .) 
+
+colnames(CI_conti)[c(6, 8, 9)] &lt;- c(&quot;beta1&quot;, &quot;CI lower&quot;, &quot;CI upper&quot;)
+
+conti_summary &lt;- round(CI_conti, 4) %&gt;% 
+  kable()
+
+conti_summary</code></pre>
 <table>
 <thead>
 <tr class="header">
@@ -166,613 +196,580 @@ ghc %&gt;%
 <th align="right">median</th>
 <th align="right">min</th>
 <th align="right">max</th>
-<th align="right">range</th>
+<th align="right">beta1</th>
+<th align="right">p.value</th>
+<th align="right">CI lower</th>
+<th align="right">CI upper</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td>loshours</td>
-<td align="right">131.144241</td>
-<td align="right">142.1068845</td>
-<td align="right">92.000000</td>
-<td align="right">1.0000000</td>
-<td align="right">2111.00000</td>
-<td align="right">2110.00000</td>
+<td align="right">131.1442</td>
+<td align="right">142.1069</td>
+<td align="right">92.0000</td>
+<td align="right">1.0000</td>
+<td align="right">2111.0000</td>
+<td align="right">0.0417</td>
+<td align="right">0.0000</td>
+<td align="right">0.0417</td>
+<td align="right">0.0417</td>
 </tr>
 <tr class="even">
 <td>losdays2</td>
-<td align="right">5.464343</td>
-<td align="right">5.9211202</td>
-<td align="right">3.833333</td>
-<td align="right">0.0416667</td>
-<td align="right">87.95833</td>
-<td align="right">87.91667</td>
+<td align="right">5.4643</td>
+<td align="right">5.9211</td>
+<td align="right">3.8333</td>
+<td align="right">0.0417</td>
+<td align="right">87.9583</td>
+<td align="right">1.0000</td>
+<td align="right">0.0000</td>
+<td align="right">1.0000</td>
+<td align="right">1.0000</td>
 </tr>
 <tr class="odd">
-<td>evisit</td>
-<td align="right">1.754153</td>
-<td align="right">1.5767706</td>
-<td align="right">1.000000</td>
-<td align="right">0.0000000</td>
-<td align="right">4.00000</td>
-<td align="right">4.00000</td>
-</tr>
-<tr class="even">
 <td>ageyear</td>
-<td align="right">65.686877</td>
-<td align="right">18.6904180</td>
-<td align="right">68.000000</td>
-<td align="right">18.0000000</td>
-<td align="right">105.00000</td>
-<td align="right">87.00000</td>
+<td align="right">65.6869</td>
+<td align="right">18.6904</td>
+<td align="right">68.0000</td>
+<td align="right">18.0000</td>
+<td align="right">105.0000</td>
+<td align="right">0.0379</td>
+<td align="right">0.0000</td>
+<td align="right">0.0277</td>
+<td align="right">0.0482</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>bmi</td>
-<td align="right">28.349291</td>
-<td align="right">7.9932524</td>
-<td align="right">27.100000</td>
-<td align="right">3.1000000</td>
-<td align="right">122.65000</td>
-<td align="right">119.55000</td>
+<td align="right">28.3493</td>
+<td align="right">7.9933</td>
+<td align="right">27.1000</td>
+<td align="right">3.1000</td>
+<td align="right">122.6500</td>
+<td align="right">-0.0283</td>
+<td align="right">0.0333</td>
+<td align="right">-0.0543</td>
+<td align="right">-0.0022</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>bpsystolic</td>
-<td align="right">130.552707</td>
-<td align="right">16.7215675</td>
-<td align="right">129.222222</td>
-<td align="right">88.7826087</td>
-<td align="right">193.96296</td>
-<td align="right">105.18035</td>
+<td align="right">130.5527</td>
+<td align="right">16.7216</td>
+<td align="right">129.2222</td>
+<td align="right">88.7826</td>
+<td align="right">193.9630</td>
+<td align="right">-0.0264</td>
+<td align="right">0.0000</td>
+<td align="right">-0.0380</td>
+<td align="right">-0.0149</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>o2sat</td>
-<td align="right">97.860864</td>
-<td align="right">4.9083125</td>
-<td align="right">97.585366</td>
-<td align="right">80.0000000</td>
-<td align="right">236.52632</td>
-<td align="right">156.52632</td>
+<td align="right">97.8609</td>
+<td align="right">4.9083</td>
+<td align="right">97.5854</td>
+<td align="right">80.0000</td>
+<td align="right">236.5263</td>
+<td align="right">-0.0397</td>
+<td align="right">0.0482</td>
+<td align="right">-0.0791</td>
+<td align="right">-0.0003</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>temperature</td>
-<td align="right">36.730002</td>
-<td align="right">0.8994875</td>
-<td align="right">36.728571</td>
-<td align="right">11.8500000</td>
-<td align="right">52.27500</td>
-<td align="right">40.42500</td>
-</tr>
-<tr class="odd">
-<td>heartrate</td>
-<td align="right">80.071102</td>
-<td align="right">13.0040566</td>
-<td align="right">79.200000</td>
-<td align="right">37.5833333</td>
-<td align="right">242.58333</td>
-<td align="right">205.00000</td>
+<td align="right">36.7300</td>
+<td align="right">0.8995</td>
+<td align="right">36.7286</td>
+<td align="right">11.8500</td>
+<td align="right">52.2750</td>
+<td align="right">0.1762</td>
+<td align="right">0.1078</td>
+<td align="right">-0.0386</td>
+<td align="right">0.3911</td>
 </tr>
 <tr class="even">
-<td>respirationrate</td>
-<td align="right">18.196034</td>
-<td align="right">2.6335489</td>
-<td align="right">17.760000</td>
-<td align="right">12.0000000</td>
-<td align="right">67.71795</td>
-<td align="right">55.71795</td>
+<td>heartrate</td>
+<td align="right">80.0711</td>
+<td align="right">13.0041</td>
+<td align="right">79.2000</td>
+<td align="right">37.5833</td>
+<td align="right">242.5833</td>
+<td align="right">0.0479</td>
+<td align="right">0.0000</td>
+<td align="right">0.0331</td>
+<td align="right">0.0627</td>
 </tr>
 <tr class="odd">
+<td>respirationrate</td>
+<td align="right">18.1960</td>
+<td align="right">2.6335</td>
+<td align="right">17.7600</td>
+<td align="right">12.0000</td>
+<td align="right">67.7179</td>
+<td align="right">0.2197</td>
+<td align="right">0.0000</td>
+<td align="right">0.1467</td>
+<td align="right">0.2928</td>
+</tr>
+<tr class="even">
 <td>bpdiastolic</td>
-<td align="right">72.517463</td>
-<td align="right">9.8018095</td>
-<td align="right">71.842105</td>
-<td align="right">29.5634921</td>
-<td align="right">154.40000</td>
-<td align="right">124.83651</td>
+<td align="right">72.5175</td>
+<td align="right">9.8018</td>
+<td align="right">71.8421</td>
+<td align="right">29.5635</td>
+<td align="right">154.4000</td>
+<td align="right">-0.0647</td>
+<td align="right">0.0000</td>
+<td align="right">-0.0844</td>
+<td align="right">-0.0451</td>
 </tr>
 </tbody>
 </table>
-<pre class="r"><code>colnames(ghc)[c(5:8, 10, 12:18 )] ## These are categorical variables</code></pre>
-<pre><code>##  [1] &quot;is30dayreadmit&quot; &quot;admitdtm&quot;       &quot;mews&quot;           &quot;cindex&quot;        
-##  [5] &quot;icu_flag&quot;       &quot;postalcode&quot;     &quot;gender&quot;         &quot;race&quot;          
-##  [9] &quot;religion&quot;       &quot;maritalstatus&quot;  &quot;facilityname&quot;   &quot;insurancetype&quot;</code></pre>
-<pre class="r"><code>ghc_cate &lt;- ghc %&gt;% 
-  select(c(5:8, 10, 12:18 ))
+<pre class="r"><code>## descriptive summary for categorical data
 
-map(ghc_cate, plyr::count) ## categorical variables frequency table</code></pre>
-<pre><code>## $is30dayreadmit
-##   x freq
-## 1 0 3094
-## 2 1  518
+colnames(ghc)[c(5:10, 12:18 )] ## These are categorical variables</code></pre>
+<pre><code>##  [1] &quot;is30dayreadmit&quot; &quot;admitdtm&quot;       &quot;mews&quot;           &quot;cindex&quot;        
+##  [5] &quot;evisit&quot;         &quot;icu_flag&quot;       &quot;postalcode&quot;     &quot;gender&quot;        
+##  [9] &quot;race&quot;           &quot;religion&quot;       &quot;maritalstatus&quot;  &quot;facilityname&quot;  
+## [13] &quot;insurancetype&quot;</code></pre>
+<pre class="r"><code>ghc_cate &lt;- ghc[,c(4, 5, 7:10, 13:18 )] 
+
+map(ghc_cate, table)</code></pre>
+<pre><code>## $losdays2
 ## 
-## $admitdtm
-##                                 x freq
-## 1          Friday, April 15, 2016    8
-## 2          Friday, April 29, 2016    2
-## 3         Friday, August 19, 2016   70
-## 4       Friday, December 30, 2016    5
-## 5       Friday, February 05, 2016  106
-## 6        Friday, January 22, 2016   45
-## 7        Friday, January 29, 2016    3
-## 8           Friday, June 10, 2016   60
-## 9           Friday, June 17, 2016    2
-## 10          Friday, June 24, 2016    5
-## 11         Friday, March 11, 2016   23
-## 12           Friday, May 20, 2016    3
-## 13       Friday, October 21, 2016    1
-## 14     Friday, September 09, 2016   72
-## 15     Friday, September 16, 2016    2
-## 16     Friday, September 23, 2016    1
-## 17         Monday, April 18, 2016    4
-## 18        Monday, August 22, 2016    1
-## 19      Monday, February 08, 2016    7
-## 20       Monday, January 25, 2016  133
-## 21          Monday, June 13, 2016  121
-## 22          Monday, June 27, 2016   76
-## 23         Monday, March 07, 2016  139
-## 24         Monday, March 14, 2016    1
-## 25         Monday, March 28, 2016   57
-## 26           Monday, May 02, 2016    3
-## 27           Monday, May 16, 2016  136
-## 28      Monday, November 21, 2016   48
-## 29      Monday, November 28, 2016   68
-## 30     Monday, September 05, 2016   47
-## 31     Monday, September 12, 2016    1
-## 32     Monday, September 26, 2016    1
-## 33       Saturday, April 16, 2016    4
-## 34       Saturday, April 30, 2016   10
-## 35      Saturday, August 20, 2016   58
-## 36    Saturday, February 06, 2016  139
-## 37     Saturday, January 23, 2016   32
-## 38        Saturday, June 11, 2016   92
-## 39        Saturday, June 25, 2016    1
-## 40       Saturday, March 12, 2016   24
-## 41         Saturday, May 14, 2016    2
-## 42   Saturday, September 10, 2016   62
-## 43   Saturday, September 17, 2016    1
-## 44   Saturday, September 24, 2016    5
-## 45         Sunday, April 17, 2016    3
-## 46        Sunday, August 21, 2016   22
-## 47      Sunday, February 07, 2016   21
-## 48       Sunday, January 24, 2016    8
-## 49          Sunday, June 12, 2016   95
-## 50          Sunday, June 19, 2016    3
-## 51          Sunday, June 26, 2016   33
-## 52         Sunday, March 06, 2016   75
-## 53         Sunday, March 13, 2016    1
-## 54           Sunday, May 01, 2016   37
-## 55           Sunday, May 15, 2016   79
-## 56      Sunday, November 20, 2016    1
-## 57      Sunday, November 27, 2016   36
-## 58       Sunday, October 16, 2016    1
-## 59     Sunday, September 11, 2016   17
-## 60     Sunday, September 18, 2016    1
-## 61     Sunday, September 25, 2016    1
-## 62       Thursday, April 14, 2016   10
-## 63       Thursday, April 28, 2016  116
-## 64      Thursday, August 18, 2016   55
-## 65    Thursday, December 29, 2016    9
-## 66    Thursday, February 11, 2016    4
-## 67     Thursday, January 28, 2016    1
-## 68        Thursday, June 09, 2016    4
-## 69        Thursday, June 16, 2016    3
-## 70        Thursday, June 23, 2016  104
-## 71       Thursday, March 31, 2016    1
-## 72         Thursday, May 19, 2016    2
-## 73    Thursday, November 24, 2016    1
-## 74     Thursday, October 20, 2016    3
-## 75   Thursday, September 08, 2016   36
-## 76   Thursday, September 15, 2016    1
-## 77   Thursday, September 22, 2016    2
-## 78        Tuesday, April 12, 2016  106
-## 79        Tuesday, April 19, 2016    1
-## 80     Tuesday, February 09, 2016   68
-## 81      Tuesday, January 12, 2016    2
-## 82      Tuesday, January 26, 2016  104
-## 83         Tuesday, June 07, 2016   50
-## 84         Tuesday, June 14, 2016    9
-## 85         Tuesday, June 21, 2016    1
-## 86         Tuesday, June 28, 2016    2
-## 87        Tuesday, March 08, 2016    9
-## 88        Tuesday, March 29, 2016   74
-## 89          Tuesday, May 17, 2016    5
-## 90          Tuesday, May 24, 2016    1
-## 91     Tuesday, November 22, 2016   43
-## 92     Tuesday, November 29, 2016    6
-## 93      Tuesday, October 18, 2016    5
-## 94    Tuesday, September 06, 2016   56
-## 95    Tuesday, September 13, 2016    2
-## 96    Tuesday, September 20, 2016   58
-## 97      Wednesday, April 13, 2016  145
-## 98      Wednesday, April 27, 2016   93
-## 99     Wednesday, August 17, 2016    1
-## 100    Wednesday, August 24, 2016    2
-## 101  Wednesday, February 10, 2016   90
-## 102   Wednesday, January 13, 2016    1
-## 103      Wednesday, June 01, 2016    1
-## 104      Wednesday, June 08, 2016   41
-## 105      Wednesday, June 15, 2016    4
-## 106      Wednesday, June 22, 2016   84
-## 107      Wednesday, June 29, 2016    2
-## 108     Wednesday, March 09, 2016    3
-## 109     Wednesday, March 30, 2016    4
-## 110       Wednesday, May 18, 2016    2
-## 111  Wednesday, November 23, 2016    1
-## 112  Wednesday, November 30, 2016    2
-## 113 Wednesday, September 07, 2016    5
-## 114 Wednesday, September 21, 2016   62
+## 0.041666667 0.083333333       0.125 0.166666667 0.208333333        0.25 
+##          14           3           4           2           4           2 
+## 0.291666667 0.333333333       0.375 0.416666667 0.458333333         0.5 
+##           5           3           7           1           2           6 
+## 0.541666667 0.583333333       0.625 0.666666667 0.708333333        0.75 
+##           4          11          18           9          11          16 
+## 0.791666667 0.833333333       0.875 0.916666667 0.958333333           1 
+##          14          23          25          21          18          25 
+## 1.041666667 1.083333333       1.125 1.166666667 1.208333333        1.25 
+##          28          24          20          22          10           9 
+## 1.291666667 1.333333333       1.375 1.416666667 1.458333333         1.5 
+##          13          16          13          16           8          20 
+## 1.541666667 1.583333333       1.625 1.666666667 1.708333333        1.75 
+##          16          17          26          18          22          21 
+## 1.791666667 1.833333333       1.875 1.916666667 1.958333333           2 
+##          41          41          42          33          37          43 
+## 2.041666667 2.083333333       2.125 2.166666667 2.208333333        2.25 
+##          50          23          38          26          27          22 
+## 2.291666667 2.333333333       2.375 2.416666667 2.458333333         2.5 
+##          19          16          17          17          16           9 
+## 2.541666667 2.583333333       2.625 2.666666667 2.708333333        2.75 
+##          19          23          20          29          25          36 
+## 2.791666667 2.833333333       2.875 2.916666667 2.958333333           3 
+##          41          36          44          32          34          36 
+## 3.041666667 3.083333333       3.125 3.166666667 3.208333333        3.25 
+##          41          31          19          24          11          19 
+## 3.291666667 3.333333333       3.375 3.416666667 3.458333333         3.5 
+##          16           9           7          15          13          11 
+## 3.541666667 3.583333333       3.625 3.666666667 3.708333333        3.75 
+##          12          17          17          12          18          30 
+## 3.791666667 3.833333333       3.875 3.916666667 3.958333333           4 
+##          15          29          18          25          33          37 
+## 4.041666667 4.083333333       4.125 4.166666667 4.208333333        4.25 
+##          26          19          21          26          18          14 
+## 4.291666667 4.333333333       4.375 4.416666667 4.458333333         4.5 
+##          13           8           8           8          11          15 
+## 4.541666667 4.583333333       4.625 4.666666667 4.708333333        4.75 
+##           7           9           9           7          15          14 
+## 4.791666667 4.833333333       4.875 4.916666667 4.958333333           5 
+##          17          20          21          26          25          25 
+## 5.041666667 5.083333333       5.125 5.166666667 5.208333333        5.25 
+##          23          13           7          15           3           9 
+## 5.291666667 5.333333333       5.375 5.416666667 5.458333333         5.5 
+##           2           4           5           2           6           6 
+## 5.541666667 5.583333333       5.625 5.666666667 5.708333333        5.75 
+##           6           3          14          11          11          17 
+## 5.791666667 5.833333333       5.875 5.916666667 5.958333333           6 
+##          13          12          14          17          12          19 
+## 6.041666667 6.083333333       6.125 6.166666667 6.208333333        6.25 
+##          19          12           9          16           4           6 
+## 6.291666667 6.333333333       6.375 6.416666667 6.458333333         6.5 
+##           5           9           4           4           3           9 
+## 6.541666667 6.583333333       6.625 6.666666667 6.708333333        6.75 
+##           3           4           3          10           8          10 
+## 6.791666667 6.833333333       6.875 6.916666667 6.958333333           7 
+##           5          12          11          17          16          22 
+## 7.041666667 7.083333333       7.125 7.166666667 7.208333333        7.25 
+##          12           9           6           8          12           4 
+## 7.291666667 7.333333333       7.375 7.416666667 7.458333333         7.5 
+##           9           5           2           5           2           5 
+## 7.541666667 7.583333333       7.625 7.666666667 7.708333333        7.75 
+##           4           6           5           8           6           6 
+## 7.791666667 7.833333333       7.875 7.916666667 7.958333333           8 
+##           4          14           6           6          14           5 
+## 8.041666667 8.083333333       8.125 8.166666667 8.208333333        8.25 
+##           9           8           6           8           4           4 
+## 8.291666667 8.333333333       8.375 8.416666667 8.458333333         8.5 
+##           3           3           5           3           7           4 
+## 8.583333333       8.625 8.666666667 8.708333333        8.75 8.791666667 
+##           2           6           4           4           2           9 
+## 8.833333333       8.875 8.916666667 8.958333333           9 9.041666667 
+##           9          10           6           7          10           5 
+## 9.083333333       9.125 9.166666667 9.208333333        9.25 9.291666667 
+##           7           7           7           3           4          10 
+## 9.333333333 9.416666667 9.458333333         9.5 9.541666667       9.625 
+##           5           1           3           2           4           3 
+## 9.666666667 9.708333333        9.75 9.791666667 9.833333333       9.875 
+##           2           2           3           1           4           6 
+## 9.916666667 9.958333333          10 10.04166667 10.08333333      10.125 
+##           3           5           6           3           8           8 
+## 10.16666667 10.20833333       10.25 10.33333333      10.375 10.41666667 
+##           2           4           3           1           3           2 
+## 10.45833333 10.58333333      10.625 10.66666667 10.70833333       10.75 
+##           2           1           3           1           5           4 
+## 10.79166667 10.83333333      10.875 10.91666667 10.95833333          11 
+##           4           4           4           3           4           7 
+## 11.04166667 11.08333333 11.20833333       11.25      11.375 11.45833333 
+##           6           6           2           3           3           1 
+##        11.5 11.54166667 11.58333333      11.625 11.66666667 11.70833333 
+##           3           1           4           1           4           2 
+##       11.75 11.79166667 11.83333333      11.875 11.91666667          12 
+##           3           4           4           2           2           1 
+## 12.04166667 12.08333333      12.125 12.16666667 12.29166667 12.41666667 
+##           2           4           1           4           2           1 
+## 12.45833333        12.5 12.58333333      12.625 12.66666667 12.70833333 
+##           2           1           3           1           3           3 
+##       12.75 12.79166667 12.83333333      12.875 12.91666667 12.95833333 
+##           4           6           5           2           1           2 
+##          13 13.04166667 13.08333333      13.125 13.20833333       13.25 
+##           2           3           2           2           2           2 
+## 13.33333333 13.54166667      13.625 13.66666667 13.70833333       13.75 
+##           2           1           1           3           1           2 
+## 13.83333333      13.875 13.91666667 13.95833333          14 14.04166667 
+##           1           1           2           1           4           1 
+## 14.08333333      14.125 14.16666667 14.20833333      14.375        14.5 
+##           2           4           4           1           2           1 
+## 14.54166667 14.58333333 14.70833333       14.75 14.79166667 14.83333333 
+##           1           3           2           1           5           2 
+##      14.875 14.91666667 14.95833333          15 15.08333333      15.125 
+##           1           2           1           2           4           3 
+## 15.16666667 15.20833333       15.25 15.29166667 15.45833333        15.5 
+##           1           1           1           1           2           1 
+## 15.54166667 15.58333333 15.66666667 15.70833333       15.75 15.79166667 
+##           1           2           2           1           1           2 
+## 15.83333333      15.875 15.95833333          16 16.04166667      16.125 
+##           1           1           1           1           1           3 
+## 16.16666667 16.20833333       16.25 16.41666667      16.625 16.70833333 
+##           1           1           2           2           1           1 
+##       16.75 16.83333333      16.875 16.91666667 16.95833333          17 
+##           1           4           1           3           2           2 
+## 17.04166667 17.08333333 17.16666667 17.20833333       17.25 17.41666667 
+##           3           3           1           2           1           1 
+## 17.45833333 17.58333333 17.66666667 17.70833333 17.83333333      17.875 
+##           2           1           2           2           1           2 
+## 17.95833333          18       18.25 18.29166667 18.45833333 18.54166667 
+##           3           1           1           1           1           2 
+## 18.58333333 18.66666667       18.75      18.875 18.91666667 18.95833333 
+##           3           1           2           1           3           2 
+##          19 19.04166667 19.16666667       19.25 19.54166667 19.83333333 
+##           1           2           1           2           1           3 
+## 19.91666667          20 20.20833333 20.29166667 20.41666667      20.625 
+##           1           2           1           1           1           2 
+## 20.66666667 20.70833333      20.875 21.04166667      21.125 21.33333333 
+##           1           1           1           1           2           1 
+##      21.375 21.45833333 21.58333333 21.83333333 22.08333333 22.16666667 
+##           1           1           1           1           1           1 
+## 22.20833333 22.33333333      22.375 22.41666667 22.45833333 22.70833333 
+##           1           1           1           1           1           1 
+##       22.75 22.83333333 22.95833333          23 23.04166667      23.125 
+##           1           1           1           1           1           1 
+##       23.25 23.33333333 23.70833333 23.83333333 24.04166667      24.125 
+##           2           1           3           1           1           2 
+##       24.25 24.29166667 25.20833333 25.33333333 25.95833333 26.08333333 
+##           1           1           3           1           1           1 
+## 27.20833333 27.54166667 27.95833333 28.16666667 28.58333333      28.625 
+##           1           1           1           1           1           2 
+## 28.66666667 28.95833333 29.20833333      29.625 30.16666667      30.375 
+##           1           1           1           1           1           1 
+## 30.54166667 30.83333333 30.91666667      31.875 32.66666667       32.75 
+##           1           1           2           1           1           1 
+## 34.91666667       35.25 36.41666667      36.625          37      37.625 
+##           1           1           1           1           1           1 
+## 38.08333333 39.54166667 40.29166667 42.91666667       48.75 50.20833333 
+##           1           1           1           1           1           1 
+##      50.375      52.375 56.70833333 57.70833333      61.125 77.54166667 
+##           1           1           1           2           1           1 
+## 87.83333333 87.95833333 
+##           1           1 
+## 
+## $is30dayreadmit
+## 
+##    0    1 
+## 3094  518 
 ## 
 ## $mews
-##       x freq
-## 1     0   39
-## 2     1  609
-## 3     2  716
-## 4     3  787
-## 5     4  690
-## 6     5  323
-## 7     6  149
-## 8     7   86
-## 9     8   25
-## 10    9   14
-## 11   10    5
-## 12   11    4
-## 13   12    1
-## 14   14    1
-## 15 &lt;NA&gt;  163
+## 
+##   0   1   2   3   4   5   6   7   8   9  10  11  12  14 
+##  39 609 716 787 690 323 149  86  25  14   5   4   1   1 
 ## 
 ## $cindex
-##   x freq
-## 1 0 1197
-## 2 1  621
-## 3 2  704
-## 4 3  424
-## 5 5  666
+## 
+##    0    1    2    3    5 
+## 1197  621  704  424  666 
+## 
+## $evisit
+## 
+##    0    1    2    3    4 
+## 1133  744  512  324  899 
 ## 
 ## $icu_flag
-##   x freq
-## 1 0 3549
-## 2 1   63
 ## 
-## $postalcode
-##         x freq
-## 1   10001    1
-## 2   10003    1
-## 3   10011    1
-## 4   10019    1
-## 5   10022    1
-## 6   10023    1
-## 7   10024    1
-## 8   10025    3
-## 9   10029    1
-## 10  10032    3
-## 11  10039    1
-## 12  10075    2
-## 13  10303    1
-## 14  10305    1
-## 15  10306    1
-## 16  10312    1
-## 17  10314    1
-## 18  10368    1
-## 19  10451    1
-## 20  10452    1
-## 21  10453    2
-## 22  10455    1
-## 23  10458    1
-## 24  10460    1
-## 25  10461    1
-## 26  10465    3
-## 27  10469    3
-## 28  10472    1
-## 29  10473    1
-## 30  10552    1
-## 31  10567    1
-## 32  10583    1
-## 33  10589    1
-## 34  10705    1
-## 35  10960    1
-## 36  10977    1
-## 37  11001   39
-## 38  11003   58
-## 39  11004   36
-## 40  11005   14
-## 41  11010   32
-## 42  11020    9
-## 43  11021   38
-## 44  11023   13
-## 45  11024   15
-## 46  11030   11
-## 47  11040   53
-## 48  11050   22
-## 49  11096    4
-## 50  11101    4
-## 51  11102    2
-## 52  11103    3
-## 53  11104    6
-## 54  11105    4
-## 55  11106    5
-## 56  11132    1
-## 57  11201    2
-## 58  11202    1
-## 59  11204    2
-## 60  11206    2
-## 61  11207    7
-## 62  11208    8
-## 63  11210    3
-## 64  11211    4
-## 65  11212    2
-## 66  11213    2
-## 67  11214    1
-## 68  11216    2
-## 69  11218    1
-## 70  11221    3
-## 71  11222    5
-## 72  11223    3
-## 73  11225    1
-## 74  11226    1
-## 75  11233    1
-## 76  11234    1
-## 77  11235    2
-## 78  11236    3
-## 79  11237    7
-## 80  11239    5
-## 81  11255    1
-## 82  11354   15
-## 83  11355    8
-## 84  11356   10
-## 85  11357   29
-## 86  11358   22
-## 87  11360   30
-## 88  11361   34
-## 89  11362   20
-## 90  11363    6
-## 91  11364   37
-## 92  11365   34
-## 93  11366   11
-## 94  11367   17
-## 95  11368   80
-## 96  11369   21
-## 97  11370    8
-## 98  11372   19
-## 99  11373   31
-## 100 11374   70
-## 101 11375  120
-## 102 11377   24
-## 103 11378   21
-## 104 11379   36
-## 105 11385   38
-## 106 11411   36
-## 107 11412   58
-## 108 11413   71
-## 109 11414   37
-## 110 11415   12
-## 111 11416   21
-## 112 11417   22
-## 113 11418   22
-## 114 11419   41
-## 115 11420   27
-## 116 11421   20
-## 117 11422   41
-## 118 11423   50
-## 119 11424    1
-## 120 11425    1
-## 121 11426   25
-## 122 11427   44
-## 123 11428   40
-## 124 11429   49
-## 125 11430    1
-## 126 11431    2
-## 127 11432   34
-## 128 11433   36
-## 129 11434   94
-## 130 11435   35
-## 131 11436   16
-## 132 11501    9
-## 133 11507    4
-## 134 11509    1
-## 135 11510    8
-## 136 11514    1
-## 137 11516    2
-## 138 11518    6
-## 139 11520    7
-## 140 11530   14
-## 141 11542   17
-## 142 11545    3
-## 143 11547    1
-## 144 11550   18
-## 145 11552   10
-## 146 11553   10
-## 147 11554   20
-## 148 11557    1
-## 149 11558    1
-## 150 11559    3
-## 151 11560    1
-## 152 11561    8
-## 153 11563   13
-## 154 11565    5
-## 155 11566    7
-## 156 11568    3
-## 157 11570    5
-## 158 11572    6
-## 159 11575    6
-## 160 11576    2
-## 161 11577   12
-## 162 11579    1
-## 163 11580   93
-## 164 11581   23
-## 165 11590   30
-## 166 11596    7
-## 167 11598    5
-## 168 11634    1
-## 169 11691   34
-## 170 11692    8
-## 171 11693   12
-## 172 11694    8
-## 173 11697    2
-## 174 11701   17
-## 175 11702    8
-## 176 11703    5
-## 177 11704   22
-## 178 11705    2
-## 179 11706   97
-## 180 11709    3
-## 181 11710   10
-## 182 11714   40
-## 183 11715    2
-## 184 11716   15
-## 185 11717   89
-## 186 11718    4
-## 187 11720    2
-## 188 11722   66
-## 189 11725    9
-## 190 11726    4
-## 191 11727    2
-## 192 11729   16
-## 193 11730   30
-## 194 11731    1
-## 195 11732    6
-## 196 11735   31
-## 197 11741    5
-## 198 11742    2
-## 199 11743    9
-## 200 11746   16
-## 201 11747   39
-## 202 11749    4
-## 203 11751   22
-## 204 11752   14
-## 205 11753   16
-## 206 11754    2
-## 207 11755    1
-## 208 11756   30
-## 209 11757   17
-## 210 11758   42
-## 211 11762   10
-## 212 11763    3
-## 213 11764    1
-## 214 11767    1
-## 215 11768    1
-## 216 11769   19
-## 217 11771    8
-## 218 11772    5
-## 219 11776    2
-## 220 11777    1
-## 221 11779    5
-## 222 11780    2
-## 223 11782   19
-## 224 11783   19
-## 225 11784    2
-## 226 11787    5
-## 227 11788    5
-## 228 11789    1
-## 229 11790    4
-## 230 11791   24
-## 231 11793   21
-## 232 11795   16
-## 233 11796    5
-## 234 11797   25
-## 235 11798    6
-## 236 11801   51
-## 237 11802    1
-## 238 11803   64
-## 239 11804   12
-## 240 11901    4
-## 241 11935    1
-## 242 11940    2
-## 243 11946    1
-## 244 11949    1
-## 245 11950    2
-## 246 11951    2
-## 247 11952    1
-## 248 11953    2
-## 249 11965    1
-## 250 11967    2
-## 251 11968    1
-## 252 11975    1
-## 253 11977    1
-## 254 12521    1
-## 255 12553    1
-## 256 12561    1
-## 257 12866    1
-## 258 12986    1
-## 259 14051    1
-## 260 14221    1
-## 261 18324    1
-## 262 18337    1
-## 263 19709    1
-## 264 20019    1
-## 265 21075    1
-## 266 21221    1
-## 267 27406    1
-## 268 27577    1
-## 269 29456    1
-## 270 31404    1
-## 271 32137    1
-## 272 32907    1
-## 273 33134    1
-## 274 33410    1
-## 275 33432    1
-## 276 33434    1
-## 277 33446    2
-## 278 33634    1
-## 279 34109    1
-## 280 34667    1
-## 281 54742    1
-## 282  8889    1
-## 283    NA   32
+##    0    1 
+## 3549   63 
 ## 
 ## $gender
-##        x freq
-## 1 Female 1952
-## 2   Male 1660
+## 
+## Female   Male 
+##   1952   1660 
 ## 
 ## $race
-##                      x freq
-## 1   African Amer/Black  772
-## 2                Asian  249
-## 3  Native Amer/Alaskan   22
-## 4 Natv Hawaii/Pacf Isl    4
-## 5    Other/Multiracial  508
-## 6                White 2057
+## 
+##   African Amer/Black                Asian  Native Amer/Alaskan 
+##                  772                  249                   22 
+## Natv Hawaii/Pacf Isl    Other/Multiracial                White 
+##                    4                  508                 2057 
 ## 
 ## $religion
-##                     x freq
-## 1           Angelican    1
-## 2            Catholic 1648
-## 3           Christian  892
-## 4              Hebrew    1
-## 5               Hindu  122
-## 6               Islam  110
-## 7              Jewish  515
-## 8              Mormon    2
-## 9      No Affiliation  174
-## 10 Non Denominational    1
-## 11              Other  146
+## 
+##          Angelican           Catholic          Christian 
+##                  1               1648                892 
+##             Hebrew              Hindu              Islam 
+##                  1                122                110 
+##             Jewish             Mormon     No Affiliation 
+##                515                  2                174 
+## Non Denominational              Other 
+##                  1                146 
 ## 
 ## $maritalstatus
-##             x freq
-## 1 Civil Union    1
-## 2    Divorced  235
-## 3     Married 1607
-## 4   Separated   51
-## 5      Single  951
-## 6     Widowed  690
-## 7        &lt;NA&gt;   77
+## 
+## Civil Union    Divorced     Married   Separated      Single     Widowed 
+##           1         235        1607          51         951         690 
 ## 
 ## $facilityname
-##                             x freq
-## 1         Lenox Hill Hospital    5
-## 2            LIJ Forest Hills  559
-## 3           LIJ Valley Stream  323
-## 4 Long Island Jewish Hospital  813
-## 5                        NSUH  983
-## 6          Plainview Hospital  323
-## 7          Southside Hospital  523
-## 8            Syosset Hospital   83
+## 
+##         Lenox Hill Hospital            LIJ Forest Hills 
+##                           5                         559 
+##           LIJ Valley Stream Long Island Jewish Hospital 
+##                         323                         813 
+##                        NSUH          Plainview Hospital 
+##                         983                         323 
+##          Southside Hospital            Syosset Hospital 
+##                         523                          83 
 ## 
 ## $insurancetype
-##          x freq
-## 1 Medicaid  166
-## 2 Medicare 1425
-## 3  Private 1987
-## 4     &lt;NA&gt;   34</code></pre>
+## 
+## Medicaid Medicare  Private 
+##      166     1425     1987</code></pre>
+<pre class="r"><code>ghc_cate &lt;- ghc_cate %&gt;% 
+  mutate(mews = recode(mews, &quot;0&quot; = &quot;0-1&quot;, &quot;1&quot; = &quot;0-1&quot;,
+                            &quot;2&quot; = &quot;2-3&quot;, &quot;3&quot; = &quot;2-3&quot;,
+                              &quot;4&quot; = &quot;4-5&quot;, &quot;5&quot; = &quot;4-5&quot;,
+                              &quot;6&quot; = &quot;&gt;5&quot;, &quot;7&quot; = &quot;&gt;5&quot;, &quot;8&quot; = &quot;&gt;5&quot;, &quot;9&quot; = &quot;&gt;5&quot;, &quot;10&quot; = &quot;&gt;5&quot;, &quot;11&quot; = &quot;&gt;5&quot;, &quot;12&quot; = &quot;&gt;5&quot;, &quot;13&quot; = &quot;&gt;5&quot;, &quot;14&quot; = &quot;&gt;5&quot;),
+         cindex = recode(cindex, &quot;0&quot; = &quot;normal&quot;, &quot;1&quot; = &quot;mild&quot;, &quot;2&quot; = &quot;mild&quot;, &quot;3&quot; = &quot;moderate&quot;, &quot;4&quot; = &quot;moderate&quot;, &quot;5&quot; = &quot;severe&quot;))
+
+
+slr_cate &lt;- function(variable) {
+ broom::tidy(lm(losdays2 ~ 0 + variable, data = ghc_cate))
+}
+  
+CI_cate &lt;- function(variable) {
+  a &lt;- lm(losdays2 ~ 0 + variable, data = ghc_cate)
+  round(confint(a), 4)
+}
+
+map(ghc_cate, slr_cate)</code></pre>
+<pre><code>## $losdays2
+##       term estimate    std.error    statistic p.value
+## 1 variable        1 5.979911e-17 1.672266e+16       0
+## 
+## $is30dayreadmit
+##        term estimate std.error statistic       p.value
+## 1 variable0 5.216629 0.1059062  49.25709  0.000000e+00
+## 2 variable1 6.943935 0.2588311  26.82805 9.961132e-145
+## 
+## $mews
+##          term estimate std.error statistic       p.value
+## 1 variable0-1 4.451710 0.2272066  19.59322  3.945963e-81
+## 2 variable2-3 5.211771 0.1491863  34.93464 3.688190e-229
+## 3 variable4-5 6.002715 0.1817204  33.03269 4.030068e-208
+## 4  variable&gt;5 6.930702 0.3425990  20.22978  4.440330e-86
+## 
+## $cindex
+##               term estimate std.error statistic       p.value
+## 1   variablenormal 4.578982 0.1692621  27.05261 6.528544e-147
+## 2     variablemild 5.223239 0.1608789  32.46691 4.298840e-203
+## 3 variablemoderate 6.334513 0.2843963  22.27354 4.394288e-103
+## 4   variablesevere 6.981294 0.2269185  30.76565 8.738034e-185
+## 
+## $evisit
+##        term estimate std.error statistic       p.value
+## 1 variable0 4.567299 0.1745847  26.16094 2.773663e-138
+## 2 variable1 5.084733 0.2154441  23.60118 1.207691e-114
+## 3 variable2 6.124756 0.2597084  23.58320 1.744995e-114
+## 4 variable3 6.554398 0.3264739  20.07633  4.485704e-85
+## 5 variable4 6.140063 0.1959933  31.32793 9.080519e-191
+## 
+## $icu_flag
+##        term estimate  std.error statistic      p.value
+## 1 variable0 5.475979 0.09939482 55.093203 0.000000e+00
+## 2 variable1 4.808862 0.74601316  6.446083 1.299726e-10
+## 
+## $gender
+##             term estimate std.error statistic       p.value
+## 1 variableFemale 5.149185 0.1338133  38.48036 8.958214e-272
+## 2   variableMale 5.834940 0.1451059  40.21159 1.724430e-292
+## 
+## $race
+##                           term estimate std.error statistic       p.value
+## 1   variableAfrican Amer/Black 5.587219 0.2130906 26.219924 7.615253e-139
+## 2                variableAsian 4.763554 0.3752090 12.695735  3.669475e-36
+## 3  variableNative Amer/Alaskan 4.401515 1.2622971  3.486909  4.944715e-04
+## 4 variableNatv Hawaii/Pacf Isl 3.364583 2.9603492  1.136549  2.558022e-01
+## 5    variableOther/Multiracial 5.369915 0.2626885 20.442137  5.706567e-88
+## 6                variableWhite 5.541829 0.1305437 42.451917 9.774595e-320
+## 
+## $religion
+##                          term estimate std.error  statistic       p.value
+## 1           variableAngelican 3.708333 5.9206407  0.6263399  5.311317e-01
+## 2            variableCatholic 5.531048 0.1458445 37.9242764 4.222477e-265
+## 3           variableChristian 5.594264 0.1982377 28.2199775 1.842984e-158
+## 4              variableHebrew 4.875000 5.9206407  0.8233906  4.103404e-01
+## 5               variableHindu 5.445697 0.5360296 10.1593204  6.310991e-24
+## 6               variableIslam 4.107197 0.5645109  7.2756729  4.209690e-13
+## 7              variableJewish 5.576537 0.2608946 21.3746746  1.565875e-95
+## 8              variableMormon 3.625000 4.1865252  0.8658732  3.866174e-01
+## 9      variableNo Affiliation 4.636494 0.4488426 10.3298887  1.137124e-24
+## 10 variableNon Denominational 2.791667 5.9206407  0.4715143  6.373021e-01
+## 11              variableOther 5.606164 0.4899957 11.4412519  8.459280e-30
+## 
+## $maritalstatus
+##                  term estimate std.error statistic       p.value
+## 1 variableCivil Union 7.083333 5.9192987  1.196651  2.315231e-01
+## 2    variableDivorced 5.233865 0.3861325 13.554585  7.701678e-41
+## 3     variableMarried 5.288192 0.1476598 35.813348 7.030752e-240
+## 4   variableSeparated 5.156863 0.8288676  6.221576  5.498388e-10
+## 5      variableSingle 5.358088 0.1919464 27.914499 4.090084e-155
+## 6     variableWidowed 6.012560 0.2253439 26.681715 4.944608e-143
+## 
+## $facilityname
+##                                  term estimate std.error statistic
+## 1         variableLenox Hill Hospital 3.866667 2.6403196  1.464469
+## 2            variableLIJ Forest Hills 5.031530 0.2497098 20.149507
+## 3           variableLIJ Valley Stream 4.843911 0.3285037 14.745379
+## 4 variableLong Island Jewish Hospital 5.146781 0.2070600 24.856473
+## 5                        variableNSUH 5.955578 0.1883063 31.627087
+## 6          variablePlainview Hospital 5.527477 0.3285037 16.826225
+## 7          variableSouthside Hospital 6.104047 0.2581610 23.644342
+## 8            variableSyosset Hospital 3.906124 0.6480410  6.027589
+##         p.value
+## 1  1.431530e-01
+## 2  1.200231e-85
+## 3  7.940872e-48
+## 4 5.144337e-126
+## 5 5.815767e-194
+## 6  3.214169e-61
+## 7 5.060912e-115
+## 8  1.831763e-09
+## 
+## $insurancetype
+##               term estimate std.error statistic       p.value
+## 1 variableMedicaid 6.507028 0.4592587  14.16855  2.230711e-44
+## 2 variableMedicare 6.034971 0.1567487  38.50092 1.301499e-271
+## 3  variablePrivate 4.991654 0.1327433  37.60382 4.711674e-261</code></pre>
+<pre class="r"><code>map(ghc_cate, CI_cate)</code></pre>
+<pre><code>## $losdays2
+##          2.5 % 97.5 %
+## variable     1      1
+## 
+## $is30dayreadmit
+##            2.5 % 97.5 %
+## variable0 5.0090 5.4243
+## variable1 6.4365 7.4514
+## 
+## $mews
+##              2.5 % 97.5 %
+## variable0-1 4.0062 4.8972
+## variable2-3 4.9193 5.5043
+## variable4-5 5.6464 6.3590
+## variable&gt;5  6.2590 7.6024
+## 
+## $cindex
+##                   2.5 % 97.5 %
+## variablenormal   4.2471 4.9108
+## variablemild     4.9078 5.5387
+## variablemoderate 5.7769 6.8921
+## variablesevere   6.5364 7.4262
+## 
+## $evisit
+##            2.5 % 97.5 %
+## variable0 4.2250 4.9096
+## variable1 4.6623 5.5071
+## variable2 5.6156 6.6339
+## variable3 5.9143 7.1945
+## variable4 5.7558 6.5243
+## 
+## $icu_flag
+##            2.5 % 97.5 %
+## variable0 5.2811 5.6709
+## variable1 3.3462 6.2715
+## 
+## $gender
+##                 2.5 % 97.5 %
+## variableFemale 4.8868 5.4115
+## variableMale   5.5504 6.1194
+## 
+## $race
+##                                2.5 % 97.5 %
+## variableAfrican Amer/Black    5.1694 6.0050
+## variableAsian                 4.0279 5.4992
+## variableNative Amer/Alaskan   1.9266 6.8764
+## variableNatv Hawaii/Pacf Isl -2.4395 9.1687
+## variableOther/Multiracial     4.8549 5.8849
+## variableWhite                 5.2859 5.7978
+## 
+## $religion
+##                              2.5 %  97.5 %
+## variableAngelican          -7.8998 15.3165
+## variableCatholic            5.2451  5.8170
+## variableChristian           5.2056  5.9829
+## variableHebrew             -6.7331 16.4831
+## variableHindu               4.3947  6.4966
+## variableIslam               3.0004  5.2140
+## variableJewish              5.0650  6.0881
+## variableMormon             -4.5832 11.8332
+## variableNo Affiliation      3.7565  5.5165
+## variableNon Denominational -8.8165 14.3998
+## variableOther               4.6455  6.5669
+## 
+## $maritalstatus
+##                       2.5 %  97.5 %
+## variableCivil Union -4.5223 18.6889
+## variableDivorced     4.4768  5.9909
+## variableMarried      4.9987  5.5777
+## variableSeparated    3.5318  6.7820
+## variableSingle       4.9818  5.7344
+## variableWidowed      5.5707  6.4544
+## 
+## $facilityname
+##                                       2.5 % 97.5 %
+## variableLenox Hill Hospital         -1.3100 9.0433
+## variableLIJ Forest Hills             4.5419 5.5211
+## variableLIJ Valley Stream            4.1998 5.4880
+## variableLong Island Jewish Hospital  4.7408 5.5527
+## variableNSUH                         5.5864 6.3248
+## variablePlainview Hospital           4.8834 6.1715
+## variableSouthside Hospital           5.5979 6.6102
+## variableSyosset Hospital             2.6356 5.1767
+## 
+## $insurancetype
+##                   2.5 % 97.5 %
+## variableMedicaid 5.6066 7.4075
+## variableMedicare 5.7276 6.3423
+## variablePrivate  4.7314 5.2519</code></pre>
 <pre class="r"><code>## The smallest ever recorded BMI is 7 
 ## Temperatures higher than 46 or 21 indicate death you are dying.
 

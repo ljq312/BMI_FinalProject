@@ -46,7 +46,7 @@ Each VisitID represents a unique visit. However, it is possible that a patient v
 
 ```{r clean_data, message=FALSE, warning=FALSE, cache = T}
 
-factor_var <- c("is30dayreadmit", "mews", "cindex", "icu_flag", "evisit", "gender", "race", "religion", "maritalstatus", "insurancetype")
+factor_var <- c("is30dayreadmit", "mews", "cindex", "icu_flag", "evisit", "gender", "race", "religion", "maritalstatus", "facilityname", "insurancetype")
 ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor variables
  
 
@@ -60,12 +60,12 @@ ghc[, factor_var] <- lapply(ghc[, factor_var], factor) ## convert to factor vari
 
 ghc_conti_summary <- ghc %>% 
   describe() %>% 
-  .[-c(1, 2, 5:10, 12:18,26,27), -c(1, 2, 6, 7, 11, 12, 13)] 
+  .[-c(1, 2, 5:10, 12:18,26,27), -c(1, 2, 6, 7, 10, 11, 12, 13)] 
 
 ghc_conti <- ghc[, -c(1, 2, 5:10, 12:18,26,27)]
 
 slr <- function(variable) {
-  lm(loshours ~ variable, data = ghc_conti)
+  lm(losdays2 ~ variable, data = ghc_conti)
 
 }
 
@@ -85,7 +85,7 @@ CI_conti <- map_df(ghc_conti, CI) %>%
   t() %>% 
   cbind(slr_conti, .) 
 
-colnames(CI_conti)[c(7, 9, 10)] <- c("beta1", "CI lower", "CI upper")
+colnames(CI_conti)[c(6, 8, 9)] <- c("beta1", "CI lower", "CI upper")
 
 conti_summary <- round(CI_conti, 4) %>% 
   kable()
@@ -99,15 +99,31 @@ conti_summary
 
 colnames(ghc)[c(5:10, 12:18 )] ## These are categorical variables
 
-ghc_cate <- ghc[,c(5, 7:10, 13:18 )] 
-map(ghc_cate, table)
- 
+ghc_cate <- ghc[,c(4, 5, 7:10, 13:18 )] 
 
-  # t() %>% 
-  cbind() %>% 
-  View()
+map(ghc_cate, table)
+
+ghc_cate <- ghc_cate %>% 
+  mutate(mews = recode(mews, "0" = "0-1", "1" = "0-1",
+                            "2" = "2-3", "3" = "2-3",
+                              "4" = "4-5", "5" = "4-5",
+                              "6" = ">5", "7" = ">5", "8" = ">5", "9" = ">5", "10" = ">5", "11" = ">5", "12" = ">5", "13" = ">5", "14" = ">5"),
+         cindex = recode(cindex, "0" = "normal", "1" = "mild", "2" = "mild", "3" = "moderate", "4" = "moderate", "5" = "severe"))
+
+
+slr_cate <- function(variable) {
+ broom::tidy(lm(losdays2 ~ 0 + variable, data = ghc_cate))
+}
   
-  ## categorical variables frequency table
+CI_cate <- function(variable) {
+  a <- lm(losdays2 ~ 0 + variable, data = ghc_cate)
+  round(confint(a), 4)
+}
+
+map(ghc_cate, slr_cate)
+map(ghc_cate, CI_cate)
+
+
 
 ```
 
